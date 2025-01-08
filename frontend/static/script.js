@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get the text content from the clipboard
         const text = (event.clipboardData || window.clipboardData).getData('text');
         // Send the pasted content to the server via fetch API
+        contentDiv.textContent = '';  // Clear the instructional text
         fetch('/validate_json', {
             method: 'POST',
             headers: {
@@ -31,7 +32,6 @@ document.addEventListener('DOMContentLoaded', function() {
             outputImage.onload = () => {
                 URL.revokeObjectURL(imageUrl); // Clean up after loading
                 spinner.style.display = 'none'; // Hide spinner
-                contentDiv.textContent = '';  // Clear the instructional text
             };
         })
         .catch(error => {
