@@ -1,0 +1,56 @@
+[
+    {
+        "id": 1, 
+        "EndDate": "2022-05-22", 
+        "StartDate": "2022-05-22", 
+        "Task": "Order Corn Seed", 
+        "Description": "Online order", 
+        "Estimate": 5, 
+        "Assignee": "Me", 
+        "Status": "ongoing", 
+        "next": ["Grow Corn"]
+    },
+    {
+        "id": 2, 
+        "EndDate": "2022-05-22", 
+        "StartDate": "2022-05-22", 
+        "Task": "Grow Corn", 
+        "Description": "Plant and grow the corn", 
+        "Estimate": 20, 
+        "Assignee": "Me", 
+        "Status": "ongoing", 
+        "next": ["Plan Maze"]
+    },
+    {
+        "id": 3, 
+        "EndDate": "2022-05-22", 
+        "StartDate": "2022-05-22", 
+        "Task": "Plan Maze", 
+        "Description": "Think hard about a fun design", 
+        "Estimate": 3, 
+        "Assignee": "Me", 
+        "Status": "blocked", 
+        "next": ["Cut Corn to Shape"]
+    },
+    {
+        "id": 4, 
+        "EndDate": "2022-05-22", 
+        "StartDate": "2022-05-22", 
+        "Task": "Cut Corn to Shape", 
+        "Description": "Slice and dice", 
+        "Estimate": 3, 
+        "Assignee": "Me",
+        "Status": "ongoing",
+        "next": ["Done"]
+    },
+    {
+        "id": 5, 
+        "EndDate": "2022-05-22", 
+        "StartDate": "2022-05-22", 
+        "Task": "Done", 
+        "Description": "Project completed", 
+        "Estimate": 0, 
+        "Assignee": "Me",
+        "Status": "completed"
+    }
+]

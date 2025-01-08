@@ -1,5 +1,13 @@
-body {
+html, body {
+    height: 100%;
+    margin: 0;
     font-family: Arial, sans-serif;
-    margin: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.centered-content {
     text-align: center;
+    font-size: 24px;
 }
