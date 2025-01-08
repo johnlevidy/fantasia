@@ -8,7 +8,7 @@
         "Estimate": 5, 
         "Assignee": "Me", 
         "Status": "ongoing", 
-        "next": ["Grow Corn"]
+        "next": ["Grow Corn", "Plan Maze"]
     },
     {
         "id": 2, 
@@ -19,7 +19,7 @@
         "Estimate": 20, 
         "Assignee": "Me", 
         "Status": "ongoing", 
-        "next": ["Plan Maze"]
+        "next": ["Cut Corn to Shape"]
     },
     {
         "id": 3, 
