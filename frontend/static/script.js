@@ -22,11 +22,12 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw response.json();
             }
             return response.blob();
         })
         .then(blob => {
+            console.log("Attempting to render")
             const imageUrl = URL.createObjectURL(blob);
             outputImage.src = imageUrl;
             outputImage.onload = () => {
@@ -34,10 +35,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 spinner.style.display = 'none'; // Hide spinner
             };
         })
-        .catch(error => {
-            console.error('Error:', error);
-            contentDiv.textContent = 'Failed to load the image';
-            spinner.style.display = 'none'; // Hide spinner
+        .catch(errorPromise => {
+            errorPromise.then(errorMessage => {
+                contentDiv.textContent = 'Failed to load the image ' + errorMessage.message;
+                spinner.style.display = 'none'; // Hide spinner
+            });
         });
     });
 });
