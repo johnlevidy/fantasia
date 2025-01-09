@@ -1,4 +1,5 @@
 from io import StringIO
+import subprocess
 import csv
 from flask import Flask, request, jsonify, render_template, send_file
 import tempfile
@@ -13,18 +14,6 @@ app = Flask(__name__, static_folder='../frontend/static', template_folder='../fr
 def home():
     return render_template('index.html')
 
-def render_content(parsed_json):
-    try:
-        dot_content = generate_dot_file(parsed_json)
-        src = Source(dot_content)
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmpfile: 
-            file_path = tmpfile.name
-            src.render(file_path, format='png', cleanup=True)
-            response = send_file(file_path + '.png', mimetype='image/png')
-            return response
-    except Exception as e:
-        return 
-
 def try_json(data, error_string):
     try:
         parsed_json = json.loads(data)
@@ -32,62 +21,89 @@ def try_json(data, error_string):
     except json.JSONDecodeError:
         error_string += ["Invalid JSON"]
     return None
- 
+
 def csv_string_to_data(csv_string, delimiter):
-    # Use StringIO to simulate a file-like object for the CSV string
     csv_file_like = StringIO(csv_string)
-    reader = csv.DictReader(csv_file_like, delimiter=delimiter)
-    return list(reader) 
+    # Read the raw lines
+    lines = csv_file_like.readlines()
+    reader = csv.reader(lines, delimiter=delimiter)
+    data = list(reader)
+    print(data)
+    if not data:
+        return []
+
+    # Extract headers
+    headers = data[0]
+    # Determine the 'next' column's starting index, assuming it exists
+    if 'next' in headers:
+        next_index = headers.index('next')
+    else:
+        raise ValueError("No 'next' column found in data")
+
+    # Process each data row according to identified headers
+    processed_data = []
+    for row in data[1:]:
+        # Combine all 'next' values
+        row_dict = {headers[i]: row[i].strip() for i in range(len(headers)) if i < next_index}
+        row_dict['next'] = [row[i].strip() for i in range(next_index, len(row)) if row[i].strip()]
+        processed_data.append(row_dict)
+
+    return processed_data
 
 def try_csv(data, error_string, delimiter):
     try:
         parsed = csv_string_to_data(data, delimiter=delimiter)
-        before_len = len(parsed)
-        # Filter out entries with empty 'Task' or 'id', and trim spaces
-        parsed = [{k: v.strip() for k, v in p.items()} for p in parsed if p['Task'].strip() and p['id'].strip()]
-        for p in parsed:
-            p['next'] = p['next'].split('|') if 'next' in p and p['next'] else []
+        # Continue processing if needed...
+        # Example: Filtering entries with empty 'Task' or invalid rows
+        parsed = [p for p in parsed if p['Task']]
+        before_len = len(data.splitlines()) - 1  # Excluding header
         after_len = len(parsed)
         if after_len != before_len:
-            print(f"Before length: {before_len}. After length: {after_len}")
+            print(f"Before length: {before_len}, After length: {after_len}")
+
         return parsed
     except Exception as e:
         print(e)
-        error_string += [f"Invalid CSV (delimiter ASCII: {ord(delimiter)})"]
+        error_string.append(f"Invalid CSV (delimiter ASCII: {ord(delimiter)})")
         return None
-   
+
 @app.route('/validate_json', methods=['POST'])
 def validate_json():
     data = request.get_json()
     parsed_content = None
     error_string = []
     content = data['content']
-
+    
     maybe_parsed_content = try_json(content, error_string)
     if maybe_parsed_content:
         print("JSON detected")
-        print(maybe_parsed_content)
     if not maybe_parsed_content:
         maybe_parsed_content = try_csv(content, error_string, ',')
-        print("Comma separated values detected")
-        print(maybe_parsed_content)
     if not maybe_parsed_content:
         maybe_parsed_content = try_csv(content, error_string, '\t')
-        print("Tab separated values detected")
-        print(maybe_parsed_content)
-
     if not maybe_parsed_content:
         return jsonify({'message': str(error_string)}), 400
-
+    
     try:
         dot_content = generate_dot_file(maybe_parsed_content)
-        src = Source(dot_content)
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmpfile: 
-            file_path = tmpfile.name
-            src.render(file_path, format='png', cleanup=True)
-            response = send_file(file_path + '.png', mimetype='image/png')
-            return response
+        
+        # Save dot_content to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.dot') as dotfile:
+            dotfile_path = dotfile.name
+            dotfile.write(dot_content)
+
+        # Define the output PNG file path
+        output_png_path = dotfile_path + '.png'
+
+        # Call Graphviz dot to render PNG
+        subprocess.run(['dot', '-Tpng', dotfile_path, '-o', output_png_path], check=True)
+
+        # Send the resulting PNG file
+        response = send_file(output_png_path, mimetype='image/png')
+        return response
+    
     except Exception as e:
-        return jsonify({'message': str("Unable to render corresponding graphviz")}), 200
+        return jsonify({'message': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
