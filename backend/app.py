@@ -2,6 +2,7 @@ import base64
 import subprocess
 import tempfile
 
+from error import Error, Severity
 from flask import Flask, request, jsonify, render_template
 from json_parser import try_json
 from csv_parser import try_csv
@@ -21,7 +22,7 @@ def home():
 def validate_json():
     data = request.get_json()
     parsed_content = None
-    error_string = []
+    error_string: list[Error] = []
     content = data['content']
     
     maybe_parsed_content = try_json(content, error_string)
@@ -55,9 +56,9 @@ def validate_json():
         # TODO: Other return values should use this pattern and load the table, but
         # probably not this one
         total_length, critical_path_length = compute_dag_metrics(maybe_parsed_content)
-        parallelism_ratio = critical_path_length / total_length
+        parallelism_ratio = total_length / critical_path_length
 
-        notifications += [{"message": f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallism Ratio: {parallelism_ratio:.2f}]", "severity": "INFO"}]
+        notifications += [{"message": f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]", "severity": "INFO"}]
         response = {
             "image": encoded_string,
             "notifications": notifications, 
