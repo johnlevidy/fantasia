@@ -1,4 +1,5 @@
 from io import StringIO
+from graph import compute_dag_metrics
 import base64
 import subprocess
 import csv
@@ -8,6 +9,9 @@ from graphviz import Source
 from dot import generate_dot_file
 import json
 import os
+
+# TODO: Get rid of any throws, swallow and append to error_string, then return 
+# those values and render in the table on the frontend
 
 app = Flask(__name__, static_folder='../frontend/static', template_folder='../frontend/templates')
 
@@ -103,8 +107,12 @@ def validate_json():
         with open(output_png_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
         notifications = []
-        for error in error_string:
-            notifications += [{"message": error, "severity": "ERROR"}]
+        # TODO: Other return values should use this pattern and load the table, but
+        # probably not this one
+        total_length, critical_path_length = compute_dag_metrics(maybe_parsed_content)
+        parallelism_ratio = critical_path_length / total_length
+
+        notifications += [{"message": f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallism Ratio: {parallelism_ratio:.2f}]", "severity": "INFO"}]
         response = {
             "image": encoded_string,
             "notifications": notifications, 

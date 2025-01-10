@@ -33,7 +33,7 @@ html, body {
 
 .notifications-container {
     text-align: left;
-    width: 100%; /* Ensures it takes full width */
+    width: 80%; /* Ensures it takes full width */
     display: none; /* Initially hidden */
     margin-bottom: 20px; /* Adds space between the notifications and the image */
 }
