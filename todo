@@ -1,6 +1,4 @@
 backend/csv_parser.py:30:        # TODO: enforce invariants on data presence more generally ( json included )
 backend/app.py:12:# TODO: Get rid of any throws, swallow and append to error_string, then return 
 backend/app.py:56:        # TODO: Other return values should use this pattern and load the table, but
-backend/error.py:1:# TODO: use this instead of error_string so we can determine severity at generation site
 frontend/static/script.js:6:    // TODO: make all this case consistent... what's normal for web projects?
-make everything use the new error stuff
