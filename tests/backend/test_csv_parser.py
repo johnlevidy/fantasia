@@ -11,12 +11,27 @@ corn_plan = """id,EndDate,StartDate,Task,Description,Estimate,Assignee,Status,ne
 4,2022-05-22,2022-05-22,Cut Corn to Shape,Slice and dice,3,Me,ongoing,Done
 5,2022-05-22,2022-05-22,Done,Project completed,0,Me,completed,"""
 
+extra_rows = """id,EndDate,StartDate,Task,Description,Estimate,Assignee,Status,next
+1,2022-05-22,2022-05-22,Order Corn Seed,Online order,5,Me,ongoing,Grow Corn,Plan Maze
+,,,,,,,
+,,,,,,,
+,,,,,,,
+,,,,,,,"""
+
 def test_success():
     error_string = []
     data = try_csv(corn_plan, error_string, delimiter = ",")
+    assert(len(data) == 5)
+    assert(len(data[0]['next']) == 2)
+
+def test_drop_extra_rows_bad_copy():
+    error_string = []
+    data = try_csv(extra_rows, error_string, delimiter = ",")
+    assert(error_string[0].startswith("4 rows were dropped"))
+    assert(len(data) == 1)
     assert(len(data[0]['next']) == 2)
 
 def test_empty():
     error_string = []
     try_csv("", error_string, delimiter = ",")
-    print(error_string)
+    assert(error_string[0].startswith('CSV appears empty'))

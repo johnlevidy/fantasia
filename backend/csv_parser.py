@@ -21,27 +21,27 @@ def csv_string_to_data(csv_string, error_string, delimiter):
     
     # Process each data row according to identified headers
     processed_data = []
+    dropped_rows = 0 
     for row in data[1:]:
-        # Combine all 'next' values
-        row_dict = {headers[i]: row[i].strip() for i in range(len(headers)) if i < next_index}
-        row_dict['next'] = [row[i].strip() for i in range(next_index, len(row)) if row[i].strip()]
+        # General case before the next_index
+        row_dict = {k: v.strip() for k, v in zip(headers[:next_index], row[:next_index])}
+        # Special case next_index and rightward
+        row_dict['next'] = [v.strip() for v in row[next_index:] if v.strip()]
+        # TODO: enforce invariants on data presence more generally ( json included )
+        if not row_dict['Task']:
+            dropped_rows += 1
+            continue
         processed_data.append(row_dict)
 
+    if dropped_rows:
+        error_string += [f"{dropped_rows} rows were dropped due to missing content"]
     return processed_data
 
 def try_csv(data, error_string, delimiter):
     try:
         parsed = csv_string_to_data(data, error_string, delimiter=delimiter)
-        # Continue processing if needed...
-        parsed = [p for p in parsed if p['Task']]
-        before_len = len(data.splitlines()) - 1  # Excluding header
-        after_len = len(parsed)
-        if after_len != before_len:
-            print(f"Before length: {before_len}, After length: {after_len}")
-
         return parsed
     except Exception as e:
-        print(e)
         error_string.append(f"Invalid CSV (delimiter ASCII: {ord(delimiter)})")
         return None
 
