@@ -2,7 +2,7 @@ import base64
 import subprocess
 import tempfile
 
-from error import Error, Severity
+from notification import Notification, Severity
 from flask import Flask, request, jsonify, render_template
 from json_parser import try_json
 from csv_parser import try_csv
@@ -18,25 +18,38 @@ app = Flask(__name__, static_folder='../frontend/static', template_folder='../fr
 def home():
     return render_template('index.html')
 
+# Returns a pair of the parsed content / python object and the notifications 
+# generated
+def parse_to_python(content):
+    json_notifications = []
+    maybe_parsed_content = try_json(content, json_notifications)
+    if maybe_parsed_content:
+        return maybe_parsed_content, json_notifications
+
+    csv_notifications = []
+    maybe_parsed_content = try_csv(content, csv_notifications, ',')
+    if maybe_parsed_content:
+        return maybe_parsed_content, csv_notifications
+
+    tsv_notifications = []
+    maybe_parsed_content = try_csv(content, tsv_notifications, '\t')
+    if maybe_parsed_content:
+        return maybe_parsed_content, tsv_notifications
+
+    return None, json_notifications + csv_notifications + tsv_notifications
+
 @app.route('/validate_json', methods=['POST'])
 def validate_json():
     data = request.get_json()
     parsed_content = None
-    error_string: list[Error] = []
+    notifications: list[Notification] = []
     content = data['content']
     
-    maybe_parsed_content = try_json(content, error_string)
-    if maybe_parsed_content:
-        print("JSON detected")
-    if not maybe_parsed_content:
-        maybe_parsed_content = try_csv(content, error_string, ',')
-    if not maybe_parsed_content:
-        maybe_parsed_content = try_csv(content, error_string, '\t')
-    if not maybe_parsed_content:
-        return jsonify({'message': str(error_string)}), 400
+    parsed_content, notifications = parse_to_python(content)
+    print(notifications)
     
     try:
-        dot_content = generate_dot_file(maybe_parsed_content)
+        dot_content = generate_dot_file(parsed_content)
         
         # Save dot_content to a temporary file
         with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.dot') as dotfile:
@@ -52,16 +65,13 @@ def validate_json():
         # Send the resulting PNG file
         with open(output_png_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-        notifications = []
-        # TODO: Other return values should use this pattern and load the table, but
-        # probably not this one
-        total_length, critical_path_length = compute_dag_metrics(maybe_parsed_content)
+        total_length, critical_path_length = compute_dag_metrics(parsed_content)
         parallelism_ratio = total_length / critical_path_length
 
-        notifications += [{"message": f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]", "severity": "INFO"}]
+        notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
         response = {
             "image": encoded_string,
-            "notifications": notifications, 
+            "notifications": [n.to_dict() for n in notifications], 
         }
         return jsonify(response)
     

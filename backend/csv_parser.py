@@ -1,19 +1,20 @@
+from notification import Notification, Severity
 from io import StringIO
 import csv
 
-def csv_string_to_data(csv_string, error_string, delimiter):
+def csv_string_to_data(csv_string, notifications, delimiter):
     csv_file_like = StringIO(csv_string)
     # Read the raw lines
     lines = csv_file_like.readlines()
     reader = csv.reader(lines, delimiter=delimiter)
     data = list(reader)
     if not data or len(data) == 0:
-        error_string += ["CSV appears empty"]
+        notifications.append(Notification(Severity.ERROR, "CSV appears empty"))
         return None
 
     headers = data[0]
     if 'next' not in headers:
-        error_string += ["Could not find 'next' column"]
+        notifications.append(Notification(Severity.ERROR, "Could not find 'next' column"))
         return None
 
     # We assume everything to the right of this column is a dependency
@@ -34,14 +35,14 @@ def csv_string_to_data(csv_string, error_string, delimiter):
         processed_data.append(row_dict)
 
     if dropped_rows:
-        error_string += [f"{dropped_rows} rows were dropped due to missing content"]
+        notifications.append(Notification(Severity.INFO, f"{dropped_rows} rows were dropped due to missing content"))
     return processed_data
 
-def try_csv(data, error_string, delimiter):
+def try_csv(data, notifications, delimiter):
     try:
-        parsed = csv_string_to_data(data, error_string, delimiter=delimiter)
+        parsed = csv_string_to_data(data, notifications, delimiter=delimiter)
         return parsed
     except Exception as e:
-        error_string.append(f"Invalid CSV (delimiter ASCII: {ord(delimiter)})")
+        notifications.append(Notification(Severity.ERROR, f"Invalid CSV (delimiter ASCII: {ord(delimiter)})"))
         return None
 
