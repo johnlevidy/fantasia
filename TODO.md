@@ -11,3 +11,4 @@
 3. Notify if an estimate doesn't make sense given start / end
 4. Notify if start > end
 5. Clearly indicate which items are complete ( requires agreeing on schema on status with the spreadsheet )
+6. Filtering on the type of the notification
