@@ -12,6 +12,21 @@
         Paste content from clipboard
     </div>
     <div id="spinner" class="spinner" style="display:none;"></div>
-    <img id="outputImage" style="max-width:100%; height:auto;">
+    <!-- Notifications Table initially hidden -->
+    <img id="outputImage" style="max-width:100%; height:auto; display: block; margin-bottom: 20px;">
+    <div id="notificationsContainer" class="notifications-container" style="max-height: 20vh; overflow-y: scroll; display: none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody id="notificationsBody">
+                <!-- Rows will be dynamically added here -->
+            </tbody>
+        </table>
+    </div>
 </body>
 </html>
+

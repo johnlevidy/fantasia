@@ -1,4 +1,5 @@
 from io import StringIO
+import base64
 import subprocess
 import csv
 from flask import Flask, request, jsonify, render_template, send_file
@@ -99,8 +100,16 @@ def validate_json():
         subprocess.run(['dot', '-Tpng', dotfile_path, '-o', output_png_path], check=True)
 
         # Send the resulting PNG file
-        response = send_file(output_png_path, mimetype='image/png')
-        return response
+        with open(output_png_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        notifications = []
+        for error in error_string:
+            notifications += [{"message": error, "severity": "ERROR"}]
+        response = {
+            "image": encoded_string,
+            "notifications": notifications, 
+        }
+        return jsonify(response)
     
     except Exception as e:
         return jsonify({'message': str(e)}), 500

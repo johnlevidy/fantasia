@@ -2,6 +2,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const contentDiv = document.querySelector('.centered-content');
     const outputImage = document.getElementById('outputImage');
     const spinner = document.getElementById('spinner');
+    const tableBody = document.getElementById('notificationsBody');
+    // TODO: make all this case consistent... what's normal for web projects?
+    const notificationsContainer = document.getElementById('notificationsContainer');
 
     contentDiv.addEventListener('paste', (event) => {
         // Prevent the default paste behavior
@@ -24,14 +27,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) {
                 throw response.json();
             }
-            return response.blob();
+            return response.json();
         })
-        .then(blob => {
-            console.log("Attempting to render")
-            const imageUrl = URL.createObjectURL(blob);
-            outputImage.src = imageUrl;
+        .then(data => {
+            console.log(data.notifications);
+            // Add new notifications to the table
+            data.notifications.forEach(notification => {
+                const row = tableBody.insertRow();
+                const severityCell = row.insertCell(0);
+                const messageCell = row.insertCell(1);
+                severityCell.textContent = notification.severity;
+                messageCell.textContent = notification.message;
+            });
+            outputImage.src = 'data:image/png;base64,' + data.image;
             outputImage.onload = () => {
-                URL.revokeObjectURL(imageUrl); // Clean up after loading
+                notificationsContainer.style.display = 'block';
                 spinner.style.display = 'none'; // Hide spinner
             };
         })

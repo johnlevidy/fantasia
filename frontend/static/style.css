@@ -3,8 +3,9 @@ html, body {
     margin: 0;
     font-family: Arial, sans-serif;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: center; /* Keeps vertical centering */
+    justify-content: center; /* Keeps horizontal centering */
+    flex-direction: column; /* Stacks children vertically */
 }
 
 .centered-content {
@@ -30,3 +31,13 @@ html, body {
     100% { transform: rotate(360deg); }
 }
 
+.notifications-container {
+    text-align: left;
+    width: 100%; /* Ensures it takes full width */
+    display: none; /* Initially hidden */
+    margin-bottom: 20px; /* Adds space between the notifications and the image */
+}
+
+table th, table td {
+    padding: 6px; /* Adjust the padding value to increase or decrease space */
+}
