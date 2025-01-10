@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const outputImage = document.getElementById('outputImage');
     const spinner = document.getElementById('spinner');
     const tableBody = document.getElementById('notificationsBody');
-    // TODO: make all this case consistent... what's normal for web projects?
     const notificationsContainer = document.getElementById('notificationsContainer');
 
     contentDiv.addEventListener('paste', (event) => {
