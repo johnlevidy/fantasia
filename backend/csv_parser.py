@@ -12,13 +12,13 @@ def csv_string_to_data(csv_string, error_string, delimiter):
         return None
 
     headers = data[0]
-
     if 'next' not in headers:
         error_string += ["Could not find 'next' column"]
         return None
 
+    # We assume everything to the right of this column is a dependency
     next_index = headers.index('next')
-
+    
     # Process each data row according to identified headers
     processed_data = []
     for row in data[1:]:
