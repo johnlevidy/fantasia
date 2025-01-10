@@ -1,16 +1,12 @@
-from io import StringIO
+import base64
+import subprocess
+import tempfile
+
+from flask import Flask, request, jsonify, render_template
 from json_parser import try_json
 from csv_parser import try_csv
 from graph import compute_dag_metrics
-import base64
-import subprocess
-import csv
-from flask import Flask, request, jsonify, render_template, send_file
-import tempfile
-from graphviz import Source
 from dot import generate_dot_file
-import json
-import os
 
 # TODO: Get rid of any throws, swallow and append to error_string, then return 
 # those values and render in the table on the frontend
