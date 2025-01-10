@@ -1,4 +1,0 @@
-1. backend/csv_parser.py:30:        # TODO: enforce invariants on data presence more generally ( json included )
-"What columns do we know we need" needs to be enforced before dot and graph starts accessing them
-
-2. backend/app.py:12:# TODO: Get rid of any throws, swallow and append to error_string, then return 
