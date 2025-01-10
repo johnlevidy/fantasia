@@ -3,6 +3,7 @@
 pkgs.mkShell {
   buildInputs = [
     pkgs.python311                   # Python 3.11
+    pkgs.python311Packages.pytest
     pkgs.python311Packages.flask     # Flask web framework
     pkgs.python311Packages.uvicorn   # ASGI server for running Flask
     pkgs.graphviz
@@ -13,6 +14,6 @@ pkgs.mkShell {
     echo "Welcome to your Flask development environment!"
     echo "Python version: $(python --version)"
     echo "Flask version: $(python -c 'import flask; print(flask.__version__)')"
-    echo "Graphviz version: $(dot -V)"
+    echo "Graphviz version: $(dot -V 2>&1)"
   '';
 }
