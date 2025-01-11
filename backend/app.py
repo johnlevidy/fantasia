@@ -2,12 +2,11 @@ import base64
 import subprocess
 import tempfile
 
-from notification import Notification, Severity
 from flask import Flask, request, jsonify, render_template
-from json_parser import try_json
-from csv_parser import try_csv
-from graph import compute_dag_metrics
-from dot import generate_dot_file
+from .json_parser import try_json
+from .csv_parser import try_csv
+from .graph import compute_dag_metrics
+from .dot import generate_dot_file
 
 # TODO: Get rid of any throws, swallow and append to error_string, then return 
 # those values and render in the table on the frontend

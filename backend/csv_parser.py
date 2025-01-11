@@ -1,4 +1,4 @@
-from notification import Notification, Severity
+from .notification import Notification, Severity
 from io import StringIO
 import csv
 

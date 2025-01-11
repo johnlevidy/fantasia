@@ -1,4 +1,4 @@
-from notification import Notification, Severity
+from .notification import Notification, Severity
 import json
 
 def try_json(data, notifications):

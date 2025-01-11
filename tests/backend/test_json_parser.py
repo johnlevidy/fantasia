@@ -23,4 +23,4 @@ def test_failure():
     error_string = []
     try_json(bad_json, error_string)
     assert(len(error_string) == 1) 
-    assert(error_string[0].startswith("Invalid JSON"))
+    assert(error_string[0].message.startswith("Invalid JSON"))

@@ -27,11 +27,11 @@ def test_success():
 def test_drop_extra_rows_bad_copy():
     error_string = []
     data = try_csv(extra_rows, error_string, delimiter = ",")
-    assert(error_string[0].startswith("4 rows were dropped"))
+    assert(error_string[0].message.startswith("4 rows were dropped"))
     assert(len(data) == 1)
     assert(len(data[0]['next']) == 2)
 
 def test_empty():
     error_string = []
     try_csv("", error_string, delimiter = ",")
-    assert(error_string[0].startswith('CSV appears empty'))
+    assert(error_string[0].message.startswith('CSV appears empty'))
