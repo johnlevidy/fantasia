@@ -1,5 +1,5 @@
 import pytest
-from backend.graph import compute_dag_metrics, contains_cycle
+from backend.graph import compute_dag_metrics, find_cycle 
 
 def test_cycle():
     tasks = [
@@ -9,7 +9,11 @@ def test_cycle():
         {'Task': 'Cut Corn to Shape', 'Estimate': '3', 'next': ['Done']},
         {'Task': 'Done', 'Estimate': '0', 'next': []}
     ]
-    assert contains_cycle(tasks)
+    cycle = find_cycle(tasks)
+    assert cycle
+    assert cycle[0] == 'Order Corn Seed'
+    assert cycle[1] == 'Plan Maze'
+    assert cycle[2] == 'Order Corn Seed'
 
 def test_compute_dag_metrics():
     # Define a sample set of tasks similar to what you might have in your application
@@ -23,7 +27,7 @@ def test_compute_dag_metrics():
 
     # Execute the function under test
     total_work, longest_path = compute_dag_metrics(tasks)
-    assert not contains_cycle(tasks)
+    assert not find_cycle(tasks)
     assert total_work == 31
     assert longest_path == 28
 
