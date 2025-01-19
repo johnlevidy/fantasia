@@ -1,3 +1,50 @@
+def find_cycle(tasks, next_key='next'):
+    # Build adjacency dict: { task_name -> [list_of_next_tasks] }
+    graph = {}
+    for t in tasks:
+        task_name = t["Task"]
+        graph[task_name] = t.get(next_key, [])
+
+    visited = set()  # tasks that have been fully processed
+    path = []        # current recursion stack as a list (to reconstruct path)
+    in_stack = set() # same nodes as in path, but in a set for quick membership checks
+
+    def dfs(current):
+        """
+        Perform DFS from 'current' task. Return a list of tasks forming a cycle
+        if found; otherwise, return None.
+        """
+        visited.add(current)
+        path.append(current)
+        in_stack.add(current)
+
+        for neighbor in graph.get(current, []):
+            if neighbor not in visited:
+                # DFS on the not-yet-visited neighbor
+                cycle = dfs(neighbor)
+                if cycle is not None:
+                    return cycle  # If the neighbor found a cycle, bubble it up
+            elif neighbor in in_stack:
+                # We've encountered a task already in the current stack => cycle
+                # Find where 'neighbor' first appeared in path to extract the cycle
+                cycle_start_index = path.index(neighbor)
+                # Return the cycle path, optionally repeat the first task to show closure
+                return path[cycle_start_index:] + [neighbor]
+
+        # Done exploring this path, remove current from the recursion stack
+        path.pop()
+        in_stack.remove(current)
+        return None
+
+    # Try DFS from each task
+    for task_name in graph:
+        if task_name not in visited:
+            cycle = dfs(task_name)
+            if cycle is not None:
+                return cycle
+
+    return None
+
 def compute_dag_metrics(tasks, next_key='next', estimate_key='Estimate'):
     # Map task IDs to task objects for quick access
     task_dict = {task['Task']: task for task in tasks}
