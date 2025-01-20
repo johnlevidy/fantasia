@@ -57,10 +57,10 @@ def validate_json():
             dotfile.write(dot_content)
 
         # Define the output PNG file path
-        output_png_path = dotfile_path + '.png'
+        output_png_path = dotfile_path + '.svg'
 
         # Call Graphviz dot to render PNG
-        subprocess.run(['dot', '-Tpng', dotfile_path, '-o', output_png_path], check=True)
+        subprocess.run(['dot', '-Tsvg', dotfile_path, '-o', output_png_path], check=True)
 
         # Send the resulting PNG file
         with open(output_png_path, "rb") as image_file:

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Paste from Clipboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom/dist/svg-pan-zoom.min.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
 <body>
@@ -13,8 +14,12 @@
     </div>
     <div id="spinner" class="spinner" style="display:none;"></div>
     <!-- Notifications Table initially hidden -->
-    <img id="outputImage" style="max-width:100%; height:auto; display: block; margin-bottom: 20px;">
-    <div id="notificationsContainer" class="notifications-container" style="max-height: 20vh; overflow-y: scroll; display: none;">
+    <div id="svgContainer" style="display: none;">
+    <!-- Example inline SVG -->
+    <svg id="outputSVG">
+    </svg>
+    </div>
+    <div id="notificationsContainer" class="notifications-container" style="max-height: 20vh; overflow-y: scroll; display: none; min-height: 140px">
         <table>
             <thead>
                 <tr>

@@ -35,9 +35,17 @@ html, body {
     text-align: left;
     width: 80%; /* Ensures it takes full width */
     display: none; /* Initially hidden */
-    margin-bottom: 20px; /* Adds space between the notifications and the image */
+    margin-top: 20px; /* Adds space between the notifications and the image */
+    margin-bottom: 80px; /* Adds space between the notifications and the image */
 }
 
 table th, table td {
     padding: 6px; /* Adjust the padding value to increase or decrease space */
+}
+
+#svgContainer {
+  width: 90vw; /* or 100vh, 80vh, whatever you like */
+  height: 75vw;
+  overflow: hidden;
+  margin-top: 40px;
 }
