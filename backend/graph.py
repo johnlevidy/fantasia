@@ -1,3 +1,26 @@
+from datetime import datetime
+import numpy as np
+from .notification import Notification, Severity
+
+def compare_busdays(start_date, end_date, estimate):
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    busdays = np.busday_count(start.date(), end.date())
+    return estimate - busdays
+
+# Returns True if there are any bad start / end dates
+def find_bad_start_end_dates(parsed_content, notifications):
+    threshold = 2
+    to_return = False
+    for row in parsed_content:
+        print(row)
+        difference = compare_busdays(row['StartDate'], row['EndDate'], int(row['Estimate']))
+        if abs(difference) > threshold:
+            task = row['Task']
+            notifications.append(Notification(Severity.INFO, f"Item {task} has an estimate inconsistent with start ({row['StartDate']}) and end ({row['EndDate']}). Estimate: {row['Estimate']}, Difference: {difference}, Threshold: {threshold}"))
+            to_return = to_return or True
+    return to_return
+
 def find_cycle(tasks, next_key='next'):
     # Build adjacency dict: { task_name -> [list_of_next_tasks] }
     graph = {}

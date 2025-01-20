@@ -54,7 +54,6 @@ def generate_svg_graph(parsed_content):
     subprocess.run(['dot', '-Tsvg', dotfile_path, '-o', output_svg_path], check=True)
     with open(output_svg_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
-
 def compute_graph_metrics(parsed_content, notifications):
     # Check for cycles before running graph algorithms
     cycle = find_cycle(parsed_content)
@@ -64,6 +63,17 @@ def compute_graph_metrics(parsed_content, notifications):
       total_length, critical_path_length = compute_dag_metrics(parsed_content)
       parallelism_ratio = total_length / critical_path_length
       notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
+
+      find_bad_start_end_dates(parsed_content, notifications)
+
+expected_columns = ['Estimate', 'Task', 'next', 'StartDate', 'EndDate']
+def verify_schema(parsed_content, notifications):
+    for task in parsed_content:
+        for expected in expected_columns:
+            if expected not in task:
+                notifications.append(Severity.FATAL, f"{task} did not contain key {expected}")
+                return False
+    return True
 
 @app.route('/process', methods=['POST'])
 def process():
@@ -75,6 +85,7 @@ def process():
     parsed_content, notifications = parse_to_python(content)
     
     try:
+        verify_schema(parsed_content, notifications)
         compute_graph_metrics(parsed_content, notifications)
         encoded_string = generate_svg_graph(parsed_content)
         response = {

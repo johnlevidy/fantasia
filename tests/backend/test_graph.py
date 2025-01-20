@@ -1,5 +1,5 @@
 import pytest
-from backend.graph import compute_dag_metrics, find_cycle 
+from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates
 
 def test_cycle():
     tasks = [
@@ -14,6 +14,21 @@ def test_cycle():
     assert cycle[0] == 'Order Corn Seed'
     assert cycle[1] == 'Plan Maze'
     assert cycle[2] == 'Order Corn Seed'
+
+def test_find_bad_start_end_dates():
+    tasks = [
+        {'Task': 'A', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25'},
+    ]
+    notifications = []
+    assert not find_bad_start_end_dates(tasks, notifications)
+    tasks = [
+        {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25'},
+        {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25'},
+    ]
+    assert find_bad_start_end_dates(tasks, notifications)
+    assert 'UniqueNameB' in notifications[0].message
+
+
 
 def test_compute_dag_metrics():
     # Define a sample set of tasks similar to what you might have in your application
