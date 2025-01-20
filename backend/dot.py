@@ -1,3 +1,7 @@
+import base64
+import subprocess
+import tempfile
+
 import textwrap
 import datetime
 from collections import defaultdict
@@ -31,4 +35,21 @@ def generate_dot_file(data):
             dot_file += f"\"{node_name}\" -> \"{next_node_name}\" [color=black];\n"
     dot_file += '}\n'
     return dot_file
+
+# Generate dot content and return b64 encoded representation
+def generate_svg_graph(parsed_content):
+    dot_content = generate_dot_file(parsed_content)
+    
+    # Save dot_content to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.dot') as dotfile:
+        dotfile_path = dotfile.name
+        dotfile.write(dot_content)
+
+    # Define the output PNG file path
+    output_svg_path = dotfile_path + '.svg'
+    # Call Graphviz dot to render PNG
+    print(output_svg_path)
+    subprocess.run(['dot', '-Tsvg', dotfile_path, '-o', output_svg_path], check=True)
+    with open(output_svg_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
 

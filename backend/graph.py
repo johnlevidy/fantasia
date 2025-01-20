@@ -83,6 +83,15 @@ def find_cycle(tasks):
 
     return None
 
+def find_unstarted_items(tasks, notifications):
+    # First, gather up milestones
+    print(tasks)
+    task_dict = {task['Task']: task for task in tasks}
+    milestones = {task['Task']: task for task in tasks if task['Status'] == 'milestone'}
+    
+
+
+
 def compute_dag_metrics(tasks):
     # Map task IDs to task objects for quick access
     task_dict = {task['Task']: task for task in tasks}
@@ -107,3 +116,23 @@ def compute_dag_metrics(tasks):
     longest_path = max(longest_path_to_end(task) for task in tasks)
 
     return total_work, longest_path
+
+def compute_graph_metrics(parsed_content, notifications):
+    # Check for cycles before running graph algorithms
+    cycle = find_cycle(parsed_content)
+    if cycle:
+        notifications.append(Notification(Severity.ERROR, f"Cycle detected in graph at: {cycle}. Cannot compute graph metrics."))
+    else:
+      total_length, critical_path_length = compute_dag_metrics(parsed_content)
+      parallelism_ratio = total_length / critical_path_length
+      notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
+
+      bad_start_end_dates = find_bad_start_end_dates(parsed_content, notifications)
+
+      # dont bother computing more metrics if there wasn't much intention behind the estimates
+      if bad_start_end_dates:
+          notifications.append(Notification(Severity.INFO, "Bad start and end dates prevent computation of more advanced metrics and alerts. Stopping."))
+          return
+
+      # Check if any items aren't started that must have been started.
+      # find_unstarted_items(parsed_content, notifications)

@@ -1,13 +1,10 @@
-import base64
-import subprocess
-import tempfile
-
 from .notification import Notification, Severity
 from flask import Flask, request, jsonify, render_template
 from .json_parser import try_json
 from .csv_parser import try_csv
-from .graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates
-from .dot import generate_dot_file
+from .graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, find_unstarted_items, compute_graph_metrics
+from .dot import generate_dot_file, generate_svg_graph
+from .schema import verify_schema
 
 # TODO: Get rid of any throws, swallow and append to error_string, then return 
 # those values and render in the table on the frontend
@@ -36,48 +33,6 @@ def parse_to_python(content):
         return maybe_parsed_content, tsv_notifications
 
     return None, json_notifications + csv_notifications + tsv_notifications
-
-
-# Generate dot content and return b64 encoded representation
-def generate_svg_graph(parsed_content):
-    dot_content = generate_dot_file(parsed_content)
-    
-    # Save dot_content to a temporary file
-    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.dot') as dotfile:
-        dotfile_path = dotfile.name
-        dotfile.write(dot_content)
-
-    # Define the output PNG file path
-    output_svg_path = dotfile_path + '.svg'
-    # Call Graphviz dot to render PNG
-    print(output_svg_path)
-    subprocess.run(['dot', '-Tsvg', dotfile_path, '-o', output_svg_path], check=True)
-    with open(output_svg_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
-def compute_graph_metrics(parsed_content, notifications):
-    # Check for cycles before running graph algorithms
-    cycle = find_cycle(parsed_content)
-    if cycle:
-        notifications.append(Notification(Severity.ERROR, f"Cycle detected in graph at: {cycle}. Cannot compute graph metrics."))
-    else:
-      total_length, critical_path_length = compute_dag_metrics(parsed_content)
-      parallelism_ratio = total_length / critical_path_length
-      notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
-
-      bad_start_end_dates = find_bad_start_end_dates(parsed_content, notifications)
-
-      # dont bother computing more metrics if there wasn't much intention behind the estimates
-      if bad_start_end_dates:
-
-
-expected_columns = ['Estimate', 'Task', 'next', 'StartDate', 'EndDate']
-def verify_schema(parsed_content, notifications):
-    for task in parsed_content:
-        for expected in expected_columns:
-            if expected not in task:
-                notifications.append(Severity.FATAL, f"{task} did not contain key {expected}")
-                return False
-    return True
 
 @app.route('/process', methods=['POST'])
 def process():
