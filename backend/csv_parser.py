@@ -13,8 +13,11 @@ def csv_string_to_data(csv_string, notifications, delimiter):
         return None
 
     headers = data[0]
+    if 'Task' not in headers:
+        notifications.append(Notification(Severity.ERROR, f"Could not find 'Task' column parsing as ordinal-separated: {ord(delimiter)}"))
+        return None
     if 'next' not in headers:
-        notifications.append(Notification(Severity.ERROR, "Could not find 'next' column"))
+        notifications.append(Notification(Severity.ERROR, f"Could not find 'next' column parsing as ordinal-separated: {ord(delimiter)}"))
         return None
 
     # We assume everything to the right of this column is a dependency

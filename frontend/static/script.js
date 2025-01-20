@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const text = (event.clipboardData || window.clipboardData).getData('text');
         // Send the pasted content to the server via fetch API
         contentDiv.textContent = '';  // Clear the instructional text
-        fetch('/validate_json', {
+        fetch('/process', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -75,6 +75,14 @@ document.addEventListener('DOMContentLoaded', function() {
             errorPromise.then(errorMessage => {
                 contentDiv.textContent = 'Failed to load the image ' + errorMessage.message;
                 spinner.style.display = 'none'; // Hide spinner
+                errorMessage.notifications.forEach(notification => {
+                    const row = tableBody.insertRow();
+                    const severityCell = row.insertCell(0);
+                    const messageCell = row.insertCell(1);
+                    severityCell.textContent = notification.severity;
+                    messageCell.textContent = notification.message;
+                });
+                notificationsContainer.style.display = 'block';
             });
         });
     });

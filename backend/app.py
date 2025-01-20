@@ -38,43 +38,48 @@ def parse_to_python(content):
 
     return None, json_notifications + csv_notifications + tsv_notifications
 
-@app.route('/validate_json', methods=['POST'])
-def validate_json():
+
+# Generate dot content and return b64 encoded representation
+def generate_svg_graph(parsed_content):
+    dot_content = generate_dot_file(parsed_content)
+    
+    # Save dot_content to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.dot') as dotfile:
+        dotfile_path = dotfile.name
+        dotfile.write(dot_content)
+
+    # Define the output PNG file path
+    output_svg_path = dotfile_path + '.svg'
+    # Call Graphviz dot to render PNG
+    print(output_svg_path)
+    subprocess.run(['dot', '-Tsvg', dotfile_path, '-o', output_svg_path], check=True)
+    with open(output_svg_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+
+def compute_graph_metrics(parsed_content, notifications):
+    # Check for cycles before running graph algorithms
+    cycle = find_cycle(parsed_content)
+    if cycle:
+        notifications.append(Notification(Severity.SEVERE, f"Cycle detected in graph at: {cycle}. Cannot compute graph metrics."))
+    else:
+      total_length, critical_path_length = compute_dag_metrics(parsed_content)
+      parallelism_ratio = total_length / critical_path_length
+
+      notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
+
+@app.route('/process', methods=['POST'])
+def process():
     data = request.get_json()
     parsed_content = None
     notifications: list[Notification] = []
     content = data['content']
     
     parsed_content, notifications = parse_to_python(content)
-    print(notifications)
     
     try:
-        dot_content = generate_dot_file(parsed_content)
-        
-        # Save dot_content to a temporary file
-        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.dot') as dotfile:
-            dotfile_path = dotfile.name
-            dotfile.write(dot_content)
-
-        # Define the output PNG file path
-        output_png_path = dotfile_path + '.svg'
-
-        # Call Graphviz dot to render PNG
-        subprocess.run(['dot', '-Tsvg', dotfile_path, '-o', output_png_path], check=True)
-
-        # Send the resulting PNG file
-        with open(output_png_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-        # Check for cycles before running graph algorithms
-        cycle = find_cycle(parsed_content)
-        if cycle:
-            notifications.append(Notification(Severity.SEVERE, f"Cycle detected in graph at: {cycle}. Cannot compute graph metrics."))
-        else:
-          total_length, critical_path_length = compute_dag_metrics(parsed_content)
-          parallelism_ratio = total_length / critical_path_length
-
-          notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
-
+        compute_graph_metrics(parsed_content, notifications)
+        encoded_string = generate_svg_graph(parsed_content)
+                
         response = {
             "image": encoded_string,
             "notifications": [n.to_dict() for n in notifications], 
@@ -82,7 +87,7 @@ def validate_json():
         return jsonify(response)
     
     except Exception as e:
-        return jsonify({'message': str(e)}), 500
+        return jsonify({'message': str(e), 'notifications': [n.to_dict() for n in notifications] }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

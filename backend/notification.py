@@ -5,7 +5,7 @@ import json
 class Severity(Enum):
     INFO = 1
     ERROR = 2
-    SEVERE = 3
+    FATAL = 3
 
 class Notification:
     def __init__(self, severity: Severity, message: str):
