@@ -6,7 +6,7 @@ from .notification import Notification, Severity
 from flask import Flask, request, jsonify, render_template
 from .json_parser import try_json
 from .csv_parser import try_csv
-from .graph import compute_dag_metrics, find_cycle
+from .graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates
 from .dot import generate_dot_file
 
 # TODO: Get rid of any throws, swallow and append to error_string, then return 
@@ -64,7 +64,11 @@ def compute_graph_metrics(parsed_content, notifications):
       parallelism_ratio = total_length / critical_path_length
       notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
-      find_bad_start_end_dates(parsed_content, notifications)
+      bad_start_end_dates = find_bad_start_end_dates(parsed_content, notifications)
+
+      # dont bother computing more metrics if there wasn't much intention behind the estimates
+      if bad_start_end_dates:
+
 
 expected_columns = ['Estimate', 'Task', 'next', 'StartDate', 'EndDate']
 def verify_schema(parsed_content, notifications):

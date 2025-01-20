@@ -2,18 +2,33 @@ from datetime import datetime
 import numpy as np
 from .notification import Notification, Severity
 
-def compare_busdays(start_date, end_date, estimate):
+def busdays_between(start_date, end_date):
     start = datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.strptime(end_date, "%Y-%m-%d")
-    busdays = np.busday_count(start.date(), end.date())
-    return estimate - busdays
+    return np.busday_count(start.date(), end.date())
+
+def compare_busdays(start_date, end_date, estimate):
+    return estimate - busdays_between(start_date, end_date)
+
+def find_overlapping_start_end_dates(parsed_content, notifications):
+    task_dict = {d['Task']: d for d in parsed_content}
+
+    to_return = False
+    for row in parsed_content:
+        this_end = row['EndDate']
+        for next in task_dict[row['Task']]['next']:
+            next_start = task_dict[next]['StartDate']
+            difference = busdays_between(next_start, this_end)
+            if difference > 0:
+                notifications.append(Notification(Severity.INFO, f"Item {task_dict[next]['Task']} has start date {next_start} and prerequisite {row['Task']} has end date {this_end}"))
+                to_return = to_return or True
+    return to_return
 
 # Returns True if there are any bad start / end dates
 def find_bad_start_end_dates(parsed_content, notifications):
     threshold = 2
     to_return = False
     for row in parsed_content:
-        print(row)
         difference = compare_busdays(row['StartDate'], row['EndDate'], int(row['Estimate']))
         if abs(difference) > threshold:
             task = row['Task']
@@ -21,12 +36,12 @@ def find_bad_start_end_dates(parsed_content, notifications):
             to_return = to_return or True
     return to_return
 
-def find_cycle(tasks, next_key='next'):
+def find_cycle(tasks):
     # Build adjacency dict: { task_name -> [list_of_next_tasks] }
     graph = {}
     for t in tasks:
         task_name = t["Task"]
-        graph[task_name] = t.get(next_key, [])
+        graph[task_name] = t.get('next', [])
 
     visited = set()  # tasks that have been fully processed
     path = []        # current recursion stack as a list (to reconstruct path)
@@ -68,7 +83,7 @@ def find_cycle(tasks, next_key='next'):
 
     return None
 
-def compute_dag_metrics(tasks, next_key='next', estimate_key='Estimate'):
+def compute_dag_metrics(tasks):
     # Map task IDs to task objects for quick access
     task_dict = {task['Task']: task for task in tasks}
     longest_path_cache = {}
@@ -80,14 +95,14 @@ def compute_dag_metrics(tasks, next_key='next', estimate_key='Estimate'):
         if task_id in longest_path_cache:
             return longest_path_cache[task_id]
         # If I have no next, return current task estimate
-        if not task[next_key]:
+        if not task['next']:
             return 0
         # Return the longest path from me
-        current_estimate = int(task[estimate_key])
-        return current_estimate + max(longest_path_to_end(task_dict[n]) for n in task[next_key])
+        current_estimate = int(task['Estimate'])
+        return current_estimate + max(longest_path_to_end(task_dict[n]) for n in task['next'])
 
     # Total work is the sum of all estimates
-    total_work = sum(int(task[estimate_key]) for task in tasks)
+    total_work = sum(int(task['Estimate']) for task in tasks)
     # Longest path is longest path from any start node
     longest_path = max(longest_path_to_end(task) for task in tasks)
 
