@@ -11,7 +11,6 @@ from .dot import generate_dot_file
 
 # TODO: Get rid of any throws, swallow and append to error_string, then return 
 # those values and render in the table on the frontend
-
 app = Flask(__name__, static_folder='../frontend/static', template_folder='../frontend/templates')
 
 @app.route('/')
@@ -60,11 +59,10 @@ def compute_graph_metrics(parsed_content, notifications):
     # Check for cycles before running graph algorithms
     cycle = find_cycle(parsed_content)
     if cycle:
-        notifications.append(Notification(Severity.SEVERE, f"Cycle detected in graph at: {cycle}. Cannot compute graph metrics."))
+        notifications.append(Notification(Severity.ERROR, f"Cycle detected in graph at: {cycle}. Cannot compute graph metrics."))
     else:
       total_length, critical_path_length = compute_dag_metrics(parsed_content)
       parallelism_ratio = total_length / critical_path_length
-
       notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
 @app.route('/process', methods=['POST'])
@@ -79,7 +77,6 @@ def process():
     try:
         compute_graph_metrics(parsed_content, notifications)
         encoded_string = generate_svg_graph(parsed_content)
-                
         response = {
             "image": encoded_string,
             "notifications": [n.to_dict() for n in notifications], 
