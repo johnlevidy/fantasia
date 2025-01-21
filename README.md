@@ -7,8 +7,13 @@ Also computes a few helpful metrics like parallelism ratio and indicates items w
 
 To run the application:
 
+```
+nix-shell
 python -m backend.app
+```
 
 To run tests:
 
-pytest
+```
+python -m pytest
+```
