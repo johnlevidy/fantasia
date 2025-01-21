@@ -1,6 +1,8 @@
+from datetime import datetime
+
 import pytest
 from networkx import NetworkXNoCycle
-from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, find_overlapping_start_end_dates, build_graph, find_start_next_before_end
+from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, build_graph, find_start_next_before_end, check_start_dates
 
 def test_cycle():
     tasks = [
@@ -35,19 +37,19 @@ def test_find_start_next_before_end():
     notifications = []
     assert not notifications
 
-def test_find_overlapping_start_end_dates():
+def test_find_start_next_before_end():
     tasks = [
         {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
     notifications = []
-    assert find_overlapping_start_end_dates(build_graph(tasks), notifications)
-    assert '[UniqueNameB] has start date' in notifications[0].message
+    assert find_start_next_before_end(build_graph(tasks), notifications)
+    assert '[UniqueNameA] has an end date after' in notifications[0].message
     tasks = [
         {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-25', 'EndDate': '2022-06-25', 'next': []},
     ]
-    assert not find_overlapping_start_end_dates(build_graph(tasks), notifications)
+    assert not find_start_next_before_end(build_graph(tasks), notifications)
 
 def test_find_bad_start_end_dates():
     tasks = [
@@ -62,6 +64,17 @@ def test_find_bad_start_end_dates():
     assert find_bad_start_end_dates(build_graph(tasks), notifications)
     assert 'UniqueNameB' in notifications[0].message
 
+def test_check_start_dates():
+    tasks = [{'Task': 'Grow Corn', 'Estimate': '20', 'StartDate': '2025-02-15', 'EndDate': '2025-02-15', 'next': []}]
+
+    notifications = []
+    today_date = datetime.strptime('2025-01-13', "%Y-%m-%d").date()
+    check_start_dates(build_graph(tasks), notifications, 3, today_date)
+
+    today_date = datetime.strptime('2025-02-13', "%Y-%m-%d").date()
+    check_start_dates(build_graph(tasks), notifications, 3, today_date)
+    assert notifications
+    
 def test_compute_dag_metrics():
     # Define a sample set of tasks similar to what you might have in your application
     tasks = [

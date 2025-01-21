@@ -1,5 +1,6 @@
 expected_columns = ['Estimate', 'Task', 'next', 'StartDate', 'EndDate', 'Status']
 enum_constraints = { 'Status': ['in progress', 'blocked', 'milestone', 'completed', 'not started'] }
+
 def verify_schema(parsed_content, notifications):
     for task in parsed_content:
         for expected in expected_columns:
