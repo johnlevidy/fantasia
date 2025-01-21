@@ -1,3 +1,5 @@
+from .notification import Notification, Severity
+
 expected_columns = ['Estimate', 'Task', 'next', 'StartDate', 'EndDate', 'Status']
 enum_constraints = { 'Status': ['in progress', 'blocked', 'milestone', 'completed', 'not started'] }
 

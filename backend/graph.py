@@ -68,12 +68,13 @@ def check_start_dates(G: nx.Graph, notifications: list[Notification], buffer_day
         print(node)
         print(data)
         start_date_str = data['StartDate']
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        status = G.nodes[node].get('Status', 'unknown')  # Assuming 'unknown' if status not set
+        if start_date_str:
+          start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+          status = G.nodes[node].get('Status', 'unknown')  # Assuming 'unknown' if status not set
 
-        # Check if the start date is within the buffer period from today and status is not 'in progress'
-        if start_date <= alert_date and (status != 'in progress' and status != 'completed'):
-            notifications.append(Notification(Severity.INFO, f"Node {node} starts on {start_date}, which is within {buffer_days} business days from today ({today_date}). Status: {status}. Check readiness."))
+          # Check if the start date is within the buffer period from today and status is not 'in progress'
+          if start_date <= alert_date and (status != 'in progress' and status != 'completed'):
+              notifications.append(Notification(Severity.INFO, f"Node {node} starts on {start_date}, which is within {buffer_days} business days from today ({today_date}). Status: {status}. Check readiness."))
 
 def compute_graph_metrics(parsed_content, notifications):
     # Check for cycles before running graph algorithms
