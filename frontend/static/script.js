@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(errorPromise => {
             errorPromise.then(errorMessage => {
-                contentDiv.textContent = 'Failed to load the image ' + errorMessage.message;
+                contentDiv.textContent = 'Failed to load the image: [' + errorMessage.message + ']';
                 spinner.style.display = 'none'; // Hide spinner
                 errorMessage.notifications.forEach(notification => {
                     const row = tableBody.insertRow();

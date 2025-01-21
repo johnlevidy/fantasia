@@ -8,6 +8,7 @@ pkgs.mkShell {
     pkgs.python311Packages.uvicorn   # ASGI server for running Flask
     pkgs.graphviz
     pkgs.python311Packages.numpy
+    pkgs.python311Packages.networkx
     pkgs.python311Packages.graphviz  # Python bindings for Graphviz
   ];
 

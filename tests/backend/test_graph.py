@@ -1,5 +1,5 @@
 import pytest
-from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, find_overlapping_start_end_dates
+from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, find_overlapping_start_end_dates, build_graph
 
 def test_cycle():
     tasks = [
@@ -21,25 +21,25 @@ def test_find_overlapping_start_end_dates():
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
     notifications = []
-    assert find_overlapping_start_end_dates(tasks, notifications)
-    assert 'UniqueNameB has start date' in notifications[0].message
+    assert find_overlapping_start_end_dates(build_graph(tasks), notifications)
+    assert '[UniqueNameB] has start date' in notifications[0].message
     tasks = [
         {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-25', 'EndDate': '2022-06-25', 'next': []},
     ]
-    assert not find_overlapping_start_end_dates(tasks, notifications)
+    assert not find_overlapping_start_end_dates(build_graph(tasks), notifications)
 
 def test_find_bad_start_end_dates():
     tasks = [
-        {'Task': 'A', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25'},
+        {'Task': 'A', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
     notifications = []
-    assert not find_bad_start_end_dates(tasks, notifications)
+    assert not find_bad_start_end_dates(build_graph(tasks), notifications)
     tasks = [
-        {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25'},
-        {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25'},
+        {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
+        {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
-    assert find_bad_start_end_dates(tasks, notifications)
+    assert find_bad_start_end_dates(build_graph(tasks), notifications)
     assert 'UniqueNameB' in notifications[0].message
 
 def test_compute_dag_metrics():

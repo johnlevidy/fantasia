@@ -1,6 +1,16 @@
 from datetime import datetime
 import numpy as np
 from .notification import Notification, Severity
+import networkx as nx
+
+def build_graph(tasks):
+    G = nx.DiGraph()
+    for task in tasks:
+        task_name = task['Task']
+        G.add_node(task_name, **task)
+        for next_task in task['next']:
+            G.add_edge(task_name, next_task)
+    return G
 
 def busdays_between(start_date, end_date):
     start = datetime.strptime(start_date, "%Y-%m-%d")
@@ -24,15 +34,30 @@ def find_overlapping_start_end_dates(parsed_content, notifications):
                 to_return = to_return or True
     return to_return
 
+def find_overlapping_start_end_dates(G: nx.Graph, notifications):
+    threshold = 0
+    to_return = False
+    for task_name, task in G.nodes(data=True):
+        this_end = task['EndDate']
+        for next_task in G.neighbors(task_name):
+            next_start = G.nodes[next_task]['StartDate']
+            difference = busdays_between(next_start, this_end)
+            if difference > threshold:
+                notifications.append(Notification(
+                    Severity.INFO,
+                    f"Item [{next_task}] has start date {next_start} and prerequisite [{task_name}] has end date {this_end}. [Difference: {difference}, Threshold: {threshold}]"
+                ))
+                to_return = True
+    return to_return
+
 # Returns True if there are any bad start / end dates
-def find_bad_start_end_dates(parsed_content, notifications):
+def find_bad_start_end_dates(G: nx.Graph, notifications):
     threshold = 2
     to_return = False
-    for row in parsed_content:
-        difference = compare_busdays(row['StartDate'], row['EndDate'], int(row['Estimate']))
+    for task_name, task in G.nodes(data=True):
+        difference = compare_busdays(task['StartDate'], task['EndDate'], int(task['Estimate']))
         if abs(difference) > threshold:
-            task = row['Task']
-            notifications.append(Notification(Severity.INFO, f"Item {task} has an estimate inconsistent with start ({row['StartDate']}) and end ({row['EndDate']}). Estimate: {row['Estimate']}, Difference: {difference}, Threshold: {threshold}"))
+            notifications.append(Notification(Severity.INFO, f"Item [{task_name}] has an estimate inconsistent with start ({task['StartDate']}) and end ({task['EndDate']}). [Estimate: {task['Estimate']}, Difference: {difference}, Threshold: {threshold}]"))
             to_return = to_return or True
     return to_return
 
@@ -88,9 +113,6 @@ def find_unstarted_items(tasks, notifications):
     print(tasks)
     task_dict = {task['Task']: task for task in tasks}
     milestones = {task['Task']: task for task in tasks if task['Status'] == 'milestone'}
-    
-
-
 
 def compute_dag_metrics(tasks):
     # Map task IDs to task objects for quick access
@@ -127,7 +149,8 @@ def compute_graph_metrics(parsed_content, notifications):
       parallelism_ratio = total_length / critical_path_length
       notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
-      bad_start_end_dates = find_bad_start_end_dates(parsed_content, notifications)
+
+      bad_start_end_dates = find_bad_start_end_dates(build_graph(parsed_content), notifications)
 
       # dont bother computing more metrics if there wasn't much intention behind the estimates
       if bad_start_end_dates:
