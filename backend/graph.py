@@ -26,10 +26,14 @@ def find_bad_start_end_dates(G: nx.Graph, notifications):
     threshold = 2
     to_return = False
     for task_name, task in G.nodes(data=True):
+        if not task['StartDate'] or not task['EndDate']:
+            notifications.append(Notification(Severity.INFO, f"Task [{task_name}] does not seem to have a valid start or end date"))
+            to_return = True
+            continue
         difference = compare_busdays(task['StartDate'], task['EndDate'], int(task['Estimate']))
         if abs(difference) > threshold:
             notifications.append(Notification(Severity.INFO, f"Item [{task_name}] has an estimate inconsistent with start ({task['StartDate']}) and end ({task['EndDate']}). [Estimate: {task['Estimate']}, Difference: {difference}, Threshold: {threshold}]"))
-            to_return = to_return or True
+            to_return = True
     return to_return
 
 # Returns a cycle if it contains any
@@ -53,8 +57,16 @@ def find_start_next_before_end(G: nx.Graph, notifications):
         for successor in G.successors(node):
             successor_start_date = G.nodes[successor]['StartDate']
             # Check if the start date of the successor is before the end date of the current node
+            if not successor_start_date:
+                notifications.append(Notification(Severity.INFO, f"Task [{task_name}] does not seem to have a valid date"))
+                to_return = True
+                continue
+            if not current_end_date:
+                notifications.append(Notification(Severity.INFO, f"Task [{node['Task']}] does not seem to have a valid date"))
+                to_return = True
+                continue
             if busdays_between(successor_start_date, current_end_date) > 0:
-                to_return = to_return or True
+                to_return = True
                 notifications.append(Notification(Severity.ERROR, f"Task [{node}] has an end date after next task [{successor}] start date"))
     return to_return
 

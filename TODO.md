@@ -3,6 +3,7 @@
 function renaming around  compute_dag_metrics, etc.. 
 enforce sentinel / milestones have 0 estimatse
 Maybe we need something like "problematic node" or some way to indicate there's a notification for a particular node
+factor out start / end sanity checking
 
 ## Notification Features
 6. Filtering on the type of the notification
