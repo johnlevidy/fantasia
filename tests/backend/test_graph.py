@@ -1,5 +1,6 @@
 import pytest
-from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, find_overlapping_start_end_dates, build_graph
+from networkx import NetworkXNoCycle
+from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, find_overlapping_start_end_dates, build_graph, find_unstarted_items
 
 def test_cycle():
     tasks = [
@@ -9,11 +10,30 @@ def test_cycle():
         {'Task': 'Cut Corn to Shape', 'Estimate': '3', 'next': ['Done']},
         {'Task': 'Done', 'Estimate': '0', 'next': []}
     ]
-    cycle = find_cycle(tasks)
+    cycle = find_cycle(build_graph(tasks))
+    print(cycle)
     assert cycle
-    assert cycle[0] == 'Order Corn Seed'
-    assert cycle[1] == 'Plan Maze'
-    assert cycle[2] == 'Order Corn Seed'
+    assert cycle[0][0] == 'Order Corn Seed'
+    assert cycle[0][1] == 'Plan Maze'
+    assert cycle[1][1] == 'Order Corn Seed'
+    assert cycle[1][0] == 'Plan Maze'
+
+def test_find_unstarted_items():
+    tasks = [
+        {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
+        {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
+    ]
+    notifications = []
+    find_unstarted_items(build_graph(tasks), notifications)
+    assert len(notifications) == 1
+    assert "[UniqueNameA] has an end date after next task" in notifications[0].message
+    tasks = [
+        {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
+        {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-25', 'EndDate': '2022-05-25', 'next': []},
+    ]
+    find_unstarted_items(build_graph(tasks), notifications)
+    notifications = []
+    assert not notifications
 
 def test_find_overlapping_start_end_dates():
     tasks = [
@@ -53,8 +73,13 @@ def test_compute_dag_metrics():
     ]
 
     # Execute the function under test
-    total_work, longest_path = compute_dag_metrics(tasks)
-    assert not find_cycle(tasks)
+    total_work, longest_path = compute_dag_metrics(build_graph(tasks))
+    try:
+        find_cycle(build_graph(tasks))
+        assert False
+    except NetworkXNoCycle:
+        assert True
+
     assert total_work == 31
     assert longest_path == 28
 
@@ -72,6 +97,6 @@ def test_compute_dag_metrics():
         {'Task': 'Project Completed', 'Estimate': '0', 'next': []}
     ]
 
-    total_work, longest_path = compute_dag_metrics(tasks)
+    total_work, longest_path = compute_dag_metrics(build_graph(tasks))
     assert total_work == 50
     assert longest_path ==  30

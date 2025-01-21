@@ -3,6 +3,7 @@
 move everything to networkx
 function renaming around  compute_dag_metrics, etc.. 
 factor out verify_schemas
+enforce sentinel / milestones have 0 estimatse
 
 ## Features
 
