@@ -44,16 +44,18 @@ def find_bad_start_end_dates(G: nx.Graph, notifications):
             to_return = to_return or True
     return to_return
 
+# Returns a cycle if it contains any
 def find_cycle(G: nx.Graph): 
     return nx.find_cycle(G)
 
+# Computes total work and the longest path
 def compute_dag_metrics(G: nx.Graph):
-    # Total work is the sum of all estimates
     total_work = sum(int(task[1]['Estimate']) for task in G.nodes(data=True))
     longest_path = nx.dag_longest_path_length(G)
     return total_work, longest_path
 
-def find_unstarted_items(G: nx.Graph, notifications):
+# 
+def find_start_next_before_end(G: nx.Graph, notifications):
     for node in G.nodes:
         current_end_date = G.nodes[node]['EndDate']
         for successor in G.successors(node):
@@ -81,4 +83,4 @@ def compute_graph_metrics(parsed_content, notifications):
           return
 
       # Check if any items aren't started that must have been started.
-      find_unstarted_items(parsed_content, notifications)
+      find_start_next_before_end(parsed_content, notifications)

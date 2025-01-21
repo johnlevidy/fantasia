@@ -1,6 +1,6 @@
 import pytest
 from networkx import NetworkXNoCycle
-from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, find_overlapping_start_end_dates, build_graph, find_unstarted_items
+from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, find_overlapping_start_end_dates, build_graph, find_start_next_before_end
 
 def test_cycle():
     tasks = [
@@ -18,20 +18,20 @@ def test_cycle():
     assert cycle[1][1] == 'Order Corn Seed'
     assert cycle[1][0] == 'Plan Maze'
 
-def test_find_unstarted_items():
+def test_find_start_next_before_end():
     tasks = [
         {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
     notifications = []
-    find_unstarted_items(build_graph(tasks), notifications)
+    find_start_next_before_end(build_graph(tasks), notifications)
     assert len(notifications) == 1
     assert "[UniqueNameA] has an end date after next task" in notifications[0].message
     tasks = [
         {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-25', 'EndDate': '2022-05-25', 'next': []},
     ]
-    find_unstarted_items(build_graph(tasks), notifications)
+    find_start_next_before_end(build_graph(tasks), notifications)
     notifications = []
     assert not notifications
 
