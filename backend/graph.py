@@ -1,9 +1,10 @@
 from datetime import datetime
 import numpy as np
+import networkx as nx
+from networkx import NetworkXNoCycle
 
 from .notification import Notification, Severity
 from .dateutil import busdays_between, compare_busdays
-import networkx as nx
 
 # Build a networkx graph out of the parsed content
 def build_graph(tasks):
@@ -33,7 +34,10 @@ def find_bad_start_end_dates(G: nx.Graph, notifications):
 
 # Returns a cycle if it contains any
 def find_cycle(G: nx.Graph): 
-    return nx.find_cycle(G)
+    try:
+        return nx.find_cycle(G)
+    except NetworkXNoCycle:
+        None 
 
 # Computes total work and the longest path
 def compute_dag_metrics(G: nx.Graph):
@@ -78,12 +82,12 @@ def compute_graph_metrics(parsed_content, notifications):
     if cycle:
         notifications.append(Notification(Severity.ERROR, f"Cycle detected in graph at: {cycle}. Cannot compute graph metrics."))
     else:
-      total_length, critical_path_length = compute_dag_metrics(parsed_content)
+      total_length, critical_path_length = compute_dag_metrics(G)
       parallelism_ratio = total_length / critical_path_length
       notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
       bad_start_end_dates = find_bad_start_end_dates(G, notifications)
-      bad_start_end_dates = bad_start_end_dates or find_start_next_before_end(parsed_content, notifications)
+      bad_start_end_dates = bad_start_end_dates or find_start_next_before_end(G, notifications)
 
       # dont bother computing more metrics if there wasn't much intention behind the estimates
       if bad_start_end_dates:

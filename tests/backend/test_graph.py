@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pytest
-from networkx import NetworkXNoCycle
 from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, build_graph, find_start_next_before_end, check_start_dates
 
 def test_cycle():
@@ -87,11 +86,7 @@ def test_compute_dag_metrics():
 
     # Execute the function under test
     total_work, longest_path = compute_dag_metrics(build_graph(tasks))
-    try:
-        find_cycle(build_graph(tasks))
-        assert False
-    except NetworkXNoCycle:
-        assert True
+    assert not find_cycle(build_graph(tasks))
 
     assert total_work == 31
     assert longest_path == 28
