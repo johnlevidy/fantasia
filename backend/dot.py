@@ -3,8 +3,7 @@ import subprocess
 import tempfile
 
 import textwrap
-import datetime
-from collections import defaultdict
+import html
 from .graph import Attr
 
 def title_format(title):
@@ -18,7 +17,7 @@ def style_text(text, **kwargs):
         return text
 
 def dot_task(task_name, task):
-    wrapped_description = '<br/>'.join(textwrap.wrap(task[Attr.desc], width=70))
+    wrapped_description = '<br/>'.join(textwrap.wrap(html.escape(task[Attr.desc]), width=70))
 
     title = title_format(task_name)
     # Milestones are tasks with zero days estimated effort.
