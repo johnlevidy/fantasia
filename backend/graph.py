@@ -7,7 +7,7 @@ from networkx import NetworkXNoCycle
 from .notification import Notification, Severity
 from .dateutil import busdays_between, compare_busdays, busdays_after
 
-# Graph node attributes this package uses.
+# Graph node and edge attributes this package uses.
 class Attr(StrEnum):
     id           = auto() # int; a unique id for the task.
     start_date   = auto() # date; the task start date.
@@ -23,6 +23,8 @@ class Attr(StrEnum):
     active       = auto() # bool; if True, this task has started but hasn't reached its end date.
     late         = auto() # bool; if True, this task's end date has passed and it's not done.
     up_next      = auto() # bool; if True, this task immediately follows one in progress.
+    critical     = auto() # bool; if True, this task (and edge) is on the critical path for the project.
+    weight       = auto() # int; the weight of the edge, based on the ancestor task estimate.
 
 # Build a networkx graph out of the parsed content
 def build_graph(tasks):
@@ -70,7 +72,8 @@ def build_graph(tasks):
             Attr.gen_estimate : estimate is None,
             Attr.assignee     : task['Assignee'] if 'Assignee' in task else '?',
             Attr.desc         : task['Description'] if 'Description' in task else '?',
-            Attr.status       : task['Status'] if 'Status' in task else 'unknown'
+            Attr.status       : task['Status'] if 'Status' in task else 'unknown',
+            Attr.critical     : False
         })
         next_id += 1
 
@@ -80,7 +83,10 @@ def build_graph(tasks):
             # should enforce that invariant ( TODO ). Those must have 0 estimate for this to work
             # This mostly lets us use networkx algos and save code
             if next_task in task_set:
-                G.add_edge(task_name, next_task, weight = estimate)
+                G.add_edge(task_name, next_task, **{
+                    Attr.weight   : estimate,
+                    Attr.critical : False
+                })
 
     return G
 
@@ -138,6 +144,13 @@ def decorate_tasks(G: nx.Graph):
                 if G.nodes[next_task][Attr.status] == 'not started':
                     G.nodes[next_task][Attr.up_next] = True
                     break                    
+
+    # Tag the critical path.
+    critical_path = nx.dag_longest_path(G)
+    for task_name in critical_path:
+        G.nodes[task_name][Attr.critical] = True
+    for edge in zip(critical_path, critical_path[1:]):
+        G.edges[edge][Attr.critical] = True
 
 # Returns True if there are any bad start / end dates
 def find_bad_start_end_dates(G: nx.Graph, notifications):

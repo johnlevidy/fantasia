@@ -11,15 +11,18 @@ def title_format(title):
 
 def style_text(text, **kwargs):
     italic = kwargs.get('italic', False)
-    if italic:
-        return f"<i>{text}</i>"
-    else:
-        return text
+    bold   = kwargs.get('bold', False)
+    
+    s = text
+    if italic: s = f"<i>{s}</i>"
+    if bold:   s = f"<b>{s}</b>"
+    
+    return s
 
 def dot_task(task_name, task):
     wrapped_description = '<br/>'.join(textwrap.wrap(html.escape(task[Attr.desc]), width=70))
+    title = title_format(style_text(task_name, bold = task[Attr.critical]))
 
-    title = title_format(task_name)
     # Milestones are tasks with zero days estimated effort.
     if task[Attr.estimate] == 0:
         return (
@@ -78,7 +81,12 @@ def generate_dot_file(G):
 
     # Add in the edges.
     for u, v in G.edges:
-        dot_file += f"{G.nodes[u][Attr.id]} -> {G.nodes[v][Attr.id]} [color=black];\n"
+        color = 'gray'
+        width = 1
+        if G.edges[u, v][Attr.critical]:
+            color = 'black'
+            width = 2
+        dot_file += f"{G.nodes[u][Attr.id]} -> {G.nodes[v][Attr.id]} [color={color}, penwidth={width}];\n"
     dot_file += '}\n'
     return dot_file
 
