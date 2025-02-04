@@ -5,8 +5,10 @@ import tempfile
 import textwrap
 import datetime
 from collections import defaultdict
-
 from .graph import Attr
+
+def title_format(title):
+    return '<FONT POINT-SIZE="14">' + title + '</FONT>'
 
 def style_text(text, **kwargs):
     italic = kwargs.get('italic', False)
@@ -18,11 +20,12 @@ def style_text(text, **kwargs):
 def dot_task(task_name, task):
     wrapped_description = '<br/>'.join(textwrap.wrap(task[Attr.desc], width=70))
 
+    title = title_format(task_name)
     # Milestones are tasks with zero days estimated effort.
     if task[Attr.estimate] == 0:
         return (
             f"{task[Attr.id]} [label=<"
-            f"<table border='1' cellborder='1'><tr><td>{task_name}</td></tr>"
+            f"<table border='1' cellborder='1'><tr><td>{title}</td></tr>"
             f"<tr><td bgcolor='lightgreen'>{task[Attr.start_date]}</td></tr>"
             f"<tr><td>{wrapped_description}</td></tr></table>"
             f">];"
@@ -36,7 +39,7 @@ def dot_task(task_name, task):
         case 'completed':
             return (
                 f"{task[Attr.id]} [label=<"
-                f"<table border='1' cellborder='1'><tr><td>{task_name} (done)</td></tr>"
+                f"<table border='1' cellborder='1'><tr><td>{title} (done)</td></tr>"
                 f"<tr><td bgcolor='lightgray'>{end_date}</td></tr></table>"
                 f">];"
             )
@@ -44,7 +47,7 @@ def dot_task(task_name, task):
             up_next_state = '(up next)' if task[Attr.up_next] else ''
             return (
                 f"{task[Attr.id]} [label=<"
-                f"<table border='1' cellborder='1'><tr><td colspan='2'>{task_name} {up_next_state}</td></tr>"
+                f"<table border='1' cellborder='1'><tr><td colspan='2'>{title} {up_next_state}</td></tr>"
                 f"<tr><td bgcolor='lightgreen'>{start_date}</td><td>{end_date}</td></tr>"
                 f"<tr><td>{task[Attr.assignee]}</td><td>{estimate} est ({task[Attr.busdays]}d avail)</td></tr>"
                 f"<tr><td colspan='2'>{wrapped_description}</td></tr></table>"
@@ -56,7 +59,7 @@ def dot_task(task_name, task):
             status_color = 'red' if task[Attr.status] == 'blocked' else 'lightblue'
             return (
                 f"{task[Attr.id]} [label=<"
-                f"<table border='1' cellborder='1'><tr><td colspan='3' bgcolor='{name_color}'>{task_name} {name_state}</td></tr>"
+                f"<table border='1' cellborder='1'><tr><td colspan='3' bgcolor='{name_color}'>{title} {name_state}</td></tr>"
                 f"<tr><td bgcolor='lightgreen'>{start_date}</td><td bgcolor='{status_color}'>{task[Attr.status]}</td><td bgcolor='lightyellow'>{end_date}</td></tr>"
                 f"<tr><td colspan='2'>{task[Attr.assignee]}</td><td>{estimate} est ({task[Attr.busdays]}d avail)</td></tr>"
                 f"<tr><td colspan='3'>{wrapped_description}</td></tr></table>"
@@ -77,8 +80,6 @@ def generate_dot_file(G):
     # Add in the edges.
     for u, v in G.edges:
         dot_file += f"{G.nodes[u][Attr.id]} -> {G.nodes[v][Attr.id]} [color=black];\n"
-
-    # Finish up.
     dot_file += '}\n'
     return dot_file
 
