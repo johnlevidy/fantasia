@@ -6,47 +6,59 @@ import textwrap
 import datetime
 from collections import defaultdict
 
+from .graph import Attr
+
+def style_text(text, **kwargs):
+    italic = kwargs.get('italic', False)
+    if italic:
+        return f"<i>{text}</i>"
+    else:
+        return text
+
 def dot_task(task_name, task):
-    wrapped_description = '<br/>'.join(textwrap.wrap(task['desc'], width=70))
+    wrapped_description = '<br/>'.join(textwrap.wrap(task[Attr.desc], width=70))
 
     # Milestones are tasks with zero days estimated effort.
-    if task['estimate'] == 0:
+    if task[Attr.estimate] == 0:
         return (
-            f"{task['id']} [label=<"
+            f"{task[Attr.id]} [label=<"
             f"<table border='1' cellborder='1'><tr><td>{task_name}</td></tr>"
-            f"<tr><td bgcolor='lightgreen'>{task['start_date']}</td></tr>"
+            f"<tr><td bgcolor='lightgreen'>{task[Attr.start_date]}</td></tr>"
             f"<tr><td>{wrapped_description}</td></tr></table>"
             f">];"
         )
 
     # A regular task.
-    match task['status']:
+    start_date = style_text(task[Attr.start_date],     italic = task[Attr.gen_start])
+    end_date   = style_text(task[Attr.end_date],       italic = task[Attr.gen_end])
+    estimate   = style_text(f"{task[Attr.estimate]}d", italic = task[Attr.gen_estimate])
+    match task[Attr.status]:
         case 'completed':
             return (
-                f"{task['id']} [label=<"
+                f"{task[Attr.id]} [label=<"
                 f"<table border='1' cellborder='1'><tr><td>{task_name} (done)</td></tr>"
-                f"<tr><td bgcolor='lightgray'>{task['end_date']}</td></tr></table>"
+                f"<tr><td bgcolor='lightgray'>{end_date}</td></tr></table>"
                 f">];"
             )
         case 'not started':
-            up_next_state = '(up next)' if task['up_next'] else ''
+            up_next_state = '(up next)' if task[Attr.up_next] else ''
             return (
-                f"{task['id']} [label=<"
+                f"{task[Attr.id]} [label=<"
                 f"<table border='1' cellborder='1'><tr><td colspan='2'>{task_name} {up_next_state}</td></tr>"
-                f"<tr><td bgcolor='lightgreen'>{task['start_date']}</td><td>{task['end_date']}</td></tr>"
-                f"<tr><td>{task['assignee']}</td><td>{task['estimate']}d est ({task['busdays']}d avail)</td></tr>"
+                f"<tr><td bgcolor='lightgreen'>{start_date}</td><td>{end_date}</td></tr>"
+                f"<tr><td>{task[Attr.assignee]}</td><td>{estimate} est ({task[Attr.busdays]}d avail)</td></tr>"
                 f"<tr><td colspan='2'>{wrapped_description}</td></tr></table>"
                 f">];"
             )
         case _:
-            name_color = 'red' if task['late'] else 'lightblue' if task['active'] else 'white'
-            name_state = '(late)' if task['late'] else '(active)' if task['active'] else ''
-            status_color = 'red' if task['status'] == 'blocked' else 'lightblue'
+            name_color = 'red' if task[Attr.late] else 'lightblue' if task[Attr.active] else 'white'
+            name_state = '(late)' if task[Attr.late] else '(active)' if task[Attr.active] else ''
+            status_color = 'red' if task[Attr.status] == 'blocked' else 'lightblue'
             return (
-                f"{task['id']} [label=<"
+                f"{task[Attr.id]} [label=<"
                 f"<table border='1' cellborder='1'><tr><td colspan='3' bgcolor='{name_color}'>{task_name} {name_state}</td></tr>"
-                f"<tr><td bgcolor='lightgreen'>{task['start_date']}</td><td bgcolor='{status_color}'>{task['status']}</td><td bgcolor='lightyellow'>{task['end_date']}</td></tr>"
-                f"<tr><td colspan='2'>{task['assignee']}</td><td>{task['estimate']}d est ({task['busdays']}d avail)</td></tr>"
+                f"<tr><td bgcolor='lightgreen'>{start_date}</td><td bgcolor='{status_color}'>{task[Attr.status]}</td><td bgcolor='lightyellow'>{end_date}</td></tr>"
+                f"<tr><td colspan='2'>{task[Attr.assignee]}</td><td>{estimate} est ({task[Attr.busdays]}d avail)</td></tr>"
                 f"<tr><td colspan='3'>{wrapped_description}</td></tr></table>"
                 f">];"
             )
@@ -64,7 +76,7 @@ def generate_dot_file(G):
 
     # Add in the edges.
     for u, v in G.edges:
-        dot_file += f"{G.nodes[u]['id']} -> {G.nodes[v]['id']} [color=black];\n"
+        dot_file += f"{G.nodes[u][Attr.id]} -> {G.nodes[v][Attr.id]} [color=black];\n"
 
     # Finish up.
     dot_file += '}\n'
