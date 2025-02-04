@@ -2,6 +2,7 @@ import base64
 import subprocess
 import tempfile
 
+import html
 import textwrap
 import datetime
 from collections import defaultdict
@@ -26,7 +27,7 @@ def generate_dot_file(data):
         node_name = item['Task'].replace(' ', '_')
         title = item['Task']
         description_color = 'red' if item.get('Status') == 'blocked' else 'lightblue'
-        wrapped_description = '<br/>'.join(textwrap.wrap(item['Description'], width=70))
+        wrapped_description = '<br/>'.join(textwrap.wrap(html.escape(item['Description']), width=70))
         estimate = item.get('estimate', '')
         status = item.get('Status', '')
         dot_file += f"\"{node_name}\" [label=<<table border='1' cellborder='1'><tr><td colspan='2'>{title}</td></tr><tr><td bgcolor='lightgreen'>{item['StartDate']}</td><td bgcolor='lightyellow'>{item['EndDate']}</td></tr><tr><td colspan='2'>{item['Assignee']}</td></tr><tr><td colspan='2' bgcolor='{description_color}'>{wrapped_description}</td></tr><tr><td>Estimate: {estimate}</td><td>Status: {status}</td></tr></table>>];\n"
