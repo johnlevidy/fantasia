@@ -5,6 +5,11 @@ enum_constraints = { 'Status': ['in progress', 'blocked', 'milestone', 'complete
 
 def verify_schema(parsed_content, notifications):
     for task in parsed_content:
+        # TODO skip tasks with name "Start" - this logic should be moved to graph.py with the rest of the
+        # graph building logic.
+        if 'Task' in task and task['Task'] == 'Start':
+            continue
+
         for expected in expected_columns:
             if expected not in task:
                 notifications.append(Notification(Severity.FATAL, f"{task} did not contain key {expected}"))

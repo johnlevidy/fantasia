@@ -1,6 +1,7 @@
-id,EndDate,StartDate,Task,Description,Estimate,Assignee,Status,next
-1,2022-05-22,2022-05-22,Order Corn Seed,Online order,5,Me,"in progress","Grow Corn","Plan Maze"
-2,2022-05-22,2022-05-22,Grow Corn,Plant and grow the corn,20,Me,"in progress","Cut Corn to Shape"
-3,2022-05-22,2022-05-22,Plan Maze,Think hard about a fun design,3,Me,blocked,"Cut Corn to Shape"
-4,2022-05-22,2022-05-22,Cut Corn to Shape,Slice and dice,3,Me,"in progress",Done
-5,2022-05-22,2022-05-22,Done,Project completed,0,Me,completed,
+id,StartDate,EndDate,Task,Description,Estimate,Assignee,Status,next
+0,2025-01-17,,Start,,,,,,
+1,+0,+2,Order Corn Seed,Online order,1,Me,"completed","Grow Corn","Plan Maze"
+2,+3,+22,Grow Corn,Plant and grow the corn,20,Me,"in progress","Cut Corn to Shape"
+3,+4,,Plan Maze,Think hard about a fun design,3,Me,blocked,"Cut Corn to Shape"
+4,,+27,Cut Corn to Shape,Slice and dice,3,Me,"not started",Done
+5,+27,+27,Done,Project completed,0,Me,"not started",

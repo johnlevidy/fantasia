@@ -45,10 +45,10 @@ def process():
     
     try:
         verify_schema(parsed_content, notifications)
-        compute_graph_metrics(parsed_content, notifications)
-        encoded_string = generate_svg_graph(parsed_content)
+        G = compute_graph_metrics(parsed_content, notifications)
+        svg = generate_svg_graph(G)
         response = {
-            "image": encoded_string,
+            "image": svg,
             "notifications": [n.to_dict() for n in notifications], 
         }
         return jsonify(response)
