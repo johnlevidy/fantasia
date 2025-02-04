@@ -20,23 +20,23 @@ def style_text(text, **kwargs):
     return s
 
 def dot_task(task_name, task):
-    wrapped_description = '<br/>'.join(textwrap.wrap(html.escape(task[Attr.desc]), width=70))
-    title = title_format(style_text(task_name, bold = task[Attr.critical]))
+    wrap_desc  = '<br/>'.join(textwrap.wrap(html.escape(task[Attr.desc]), width=70))
+    title      = title_format(style_text(task_name, bold = task[Attr.critical]))
+    start_date = style_text(task[Attr.start_date],     italic = task[Attr.gen_start])
+    end_date   = style_text(task[Attr.end_date],       italic = task[Attr.gen_end])
+    estimate   = style_text(f"{task[Attr.estimate]}d", italic = task[Attr.gen_estimate])
 
     # Milestones are tasks with zero days estimated effort.
     if task[Attr.estimate] == 0:
         return (
             f"{task[Attr.id]} [label=<"
             f"<table border='1' cellborder='1'><tr><td>{title}</td></tr>"
-            f"<tr><td bgcolor='lightgreen'>{task[Attr.start_date]}</td></tr>"
-            f"<tr><td>{wrapped_description}</td></tr></table>"
+            f"<tr><td bgcolor='lightgreen'>{end_date}</td></tr>"
+            f"<tr><td>{wrap_desc}</td></tr></table>"
             f">];"
         )
 
     # A regular task.
-    start_date = style_text(task[Attr.start_date],     italic = task[Attr.gen_start])
-    end_date   = style_text(task[Attr.end_date],       italic = task[Attr.gen_end])
-    estimate   = style_text(f"{task[Attr.estimate]}d", italic = task[Attr.gen_estimate])
     match task[Attr.status]:
         case 'completed':
             return (
@@ -52,7 +52,7 @@ def dot_task(task_name, task):
                 f"<table border='1' cellborder='1'><tr><td colspan='2'>{title} {up_next_state}</td></tr>"
                 f"<tr><td bgcolor='lightgreen'>{start_date}</td><td>{end_date}</td></tr>"
                 f"<tr><td>{task[Attr.assignee]}</td><td>{estimate} est ({task[Attr.busdays]}d avail)</td></tr>"
-                f"<tr><td colspan='2'>{wrapped_description}</td></tr></table>"
+                f"<tr><td colspan='2'>{wrap_desc}</td></tr></table>"
                 f">];"
             )
         case _:
@@ -64,7 +64,7 @@ def dot_task(task_name, task):
                 f"<table border='1' cellborder='1'><tr><td colspan='3' bgcolor='{name_color}'>{title} {name_state}</td></tr>"
                 f"<tr><td bgcolor='lightgreen'>{start_date}</td><td bgcolor='{status_color}'>{task[Attr.status]}</td><td bgcolor='lightyellow'>{end_date}</td></tr>"
                 f"<tr><td colspan='2'>{task[Attr.assignee]}</td><td>{estimate} est ({task[Attr.busdays]}d avail)</td></tr>"
-                f"<tr><td colspan='3'>{wrapped_description}</td></tr></table>"
+                f"<tr><td colspan='3'>{wrap_desc}</td></tr></table>"
                 f">];"
             )
 
@@ -72,7 +72,7 @@ def generate_dot_file(G):
     # Graph top-level.
     dot_file = (
         'digraph Items {\n'
-        'rankdir=LR;\n'
+        'rankdir=TB;\n'
         'node [fontname="Calibri,sans-serif" fontsize="12pt" shape=plaintext];\n'
     )
 

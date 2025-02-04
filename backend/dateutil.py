@@ -7,5 +7,5 @@ def busdays_between(start, end):
 def compare_busdays(start, end, estimate):
     return estimate - busdays_between(start, end)
 
-def busdays_after(date, days):
+def busdays_offset(date, days):
     return np.busday_offset(date, days, roll='forward').astype(datetime.datetime)
