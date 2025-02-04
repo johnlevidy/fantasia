@@ -70,7 +70,7 @@ def generate_dot_file(G):
     dot_file = (
         'digraph Items {\n'
         'rankdir=LR;\n'
-        'node [fontname="Calibri" fontsize="12pt" shape=plaintext];\n'
+        'node [fontname="Calibri,sans-serif" fontsize="12pt" shape=plaintext];\n'
     )
 
     # Write out all task nodes.
