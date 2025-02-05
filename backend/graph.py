@@ -16,15 +16,33 @@ class Attr(StrEnum):
     gen_start    = auto() # bool; True if a start date was generated for this task.
     gen_end      = auto() # bool; True if an end date was generated for this task.
     gen_estimate = auto() # bool; True if an estimate was generated for this task.
+    jit_start    = auto() # date; the date this task should start if we want to have minimal slack in the project.
+    jit_end      = auto() # date; the date this task should end if we want to have minimal slack in the project.
+    buffer       = auto() # int; the number of business days difference between the task's scheduled dates and the estimate.
+    floot        = auto() # int; how many business days later the task can end without causing the overall project to end late.
+                          # actually the term is "float" but, you know.
+    slack        = auto() # int; the number of business days difference between the task's end date and the start of the next. Assigned to edges.
     assignee     = auto() # str; who's assigned to the task.
     desc         = auto() # str; a description of the task.
     status       = auto() # str; the task status. TODO should also be an enum.
+    user_status  = auto() # str; what the user entered for a status.
     busdays      = auto() # int; the number of business days between the task start and end.
     active       = auto() # bool; if True, this task has started but hasn't reached its end date.
     late         = auto() # bool; if True, this task's end date has passed and it's not done.
     up_next      = auto() # bool; if True, this task immediately follows one in progress.
     critical     = auto() # bool; if True, this task (and edge) is on the critical path for the project.
     weight       = auto() # int; the weight of the edge, based on the ancestor task estimate.
+
+# Status normalization.
+status_normalization = { 
+    '':              'not started',
+    'completed':     'done',
+    'in review':     'in progress',
+    'investigating': 'in progress',
+    'on hold':       'in progress',
+    'paused':        'in progress',
+    'waiting':       'in progress'
+}
 
 # Build a networkx graph out of the parsed content
 def build_graph(tasks):
@@ -61,6 +79,10 @@ def build_graph(tasks):
         default_estimate = 5
         estimate = int(task['Estimate']) if 'Estimate' in task else None
 
+        # Status.
+        user_status = task['Status'] if 'Status' in task else 'not started'
+        status = status_normalization.get(user_status, user_status)
+
         # Add the node to the graph and set attributes from the task.
         G.add_node(task_name, **{
             Attr.id           : next_id,
@@ -72,7 +94,9 @@ def build_graph(tasks):
             Attr.gen_estimate : estimate is None,
             Attr.assignee     : task['Assignee'] if 'Assignee' in task else '?',
             Attr.desc         : task['Description'] if 'Description' in task else '?',
-            Attr.status       : task['Status'] if 'Status' in task else 'unknown',
+            Attr.status       : status,
+            Attr.user_status  : user_status,
+            Attr.up_next      : False,
             Attr.critical     : False
         })
         next_id += 1
@@ -151,25 +175,47 @@ def populate_dates(G: nx.Graph):
                 succ[Attr.start_date] = task[Attr.end_date]
                 succ[Attr.gen_start]  = True
 
+def calculate_jit_dates(G: nx.Graph):
+    # Similar to the date propagation, but in this case we start with the last task and force
+    # setting predecessor start dates so that the project (and every task within it) starts as 
+    # late as possible while still hitting the final end dates.
+    # Only works if all leaf tasks have end dates.
+    for task_name in reversed(list(nx.topological_sort(G))):
+        task = G.nodes[task_name]
+
+        # If this task doesn't already have a JIT end date, set it to the current end date.
+        # Then set the JIT start based on the estimate.
+        if Attr.jit_end not in task:
+            task[Attr.jit_end] = task[Attr.end_date]
+        task[Attr.jit_start] = busdays_offset(task[Attr.jit_end], -task[Attr.estimate])
+
+        # Backpropagate the JIT start date to predecessor tasks.
+        for pred_name in G.predecessors(task_name):
+            pred = G.nodes[pred_name]
+            if Attr.jit_end not in pred or (task[Attr.jit_start] < pred[Attr.jit_end]):
+                pred[Attr.jit_end] = task[Attr.jit_start]
+
 # Decorate tasks with some useful information.
 def decorate_tasks(G: nx.Graph):
     # Today's date - tasks that contain this date are "active".
     # TODO should match the user's timezone.
     today = datetime.now().date()
 
-    for task_name in G.nodes:
-        task = G.nodes[task_name]
-        task[Attr.busdays] = busdays_between(task[Attr.start_date], task[Attr.end_date])
+    for task_name, task in G.nodes(data=True):
         task[Attr.active]  = task[Attr.start_date] <= today <= task[Attr.end_date]
-        task[Attr.late]    = task[Attr.end_date] < today and task[Attr.status] != 'completed'
-        task[Attr.up_next] = False # default; will set later when we walk the graph.
+        task[Attr.late]    = task[Attr.end_date] < today and task[Attr.status] != 'done'
+        task[Attr.busdays] = busdays_between(task[Attr.start_date], task[Attr.end_date])
+        task[Attr.floot]   = busdays_between(task[Attr.end_date], task[Attr.jit_end])
+        task[Attr.buffer]  = task[Attr.busdays] - task[Attr.estimate]
 
+        # Calculate slack between this task and all successor tasks.
         # Tasks following in progress or blocked tasks that are not started are "up next".
-        if task[Attr.status] == 'in progress' or task[Attr.status] == 'blocked':       
-            for next_task in G.neighbors(task_name):
-                if G.nodes[next_task][Attr.status] == 'not started':
-                    G.nodes[next_task][Attr.up_next] = True
-                    break                    
+        live = task[Attr.status] == 'in progress' or task[Attr.status] == 'blocked'
+        for succ_name in G.successors(task_name):
+            succ = G.nodes[succ_name]
+            G.edges[task_name, succ_name][Attr.slack] = busdays_between(task[Attr.end_date], succ[Attr.start_date])
+            if live and succ[Attr.status] == 'not started':
+                succ[Attr.up_next] = True
 
     # Tag the critical path.
     critical_path = nx.dag_longest_path(G)
@@ -243,7 +289,7 @@ def check_start_dates(G: nx.Graph, notifications: list[Notification], buffer_day
           status = G.nodes[node][Attr.status]
 
           # Check if the start date is within the buffer period from today and status is not 'in progress'
-          if start_date <= alert_date and (status != 'in progress' and status != 'completed'):
+          if start_date <= alert_date and (status != 'in progress' and status != 'done'):
             notifications.append(Notification(Severity.INFO, f"Node {node} starts on {start_date}, which is within {buffer_days} business days from today ({today_date}). Status: {status}. Check readiness."))
 
 def compute_graph_metrics(parsed_content, notifications):
@@ -266,6 +312,7 @@ def compute_graph_metrics(parsed_content, notifications):
     # Dates and decorations.
     # Do dates first so the decorators have something to work with.
     populate_dates(G)
+    calculate_jit_dates(G)
     decorate_tasks(G)
 
     # dont bother computing more metrics if there wasn't much intention behind the estimates

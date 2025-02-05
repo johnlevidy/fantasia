@@ -25,20 +25,17 @@ def csv_string_to_data(csv_string, notifications, delimiter):
     
     # Process each data row according to identified headers
     processed_data = []
-    dropped_rows = 0 
     for row in data[1:]:
         # General case before the next_index
         row_dict = {k: v.strip() for k, v in zip(headers[:next_index], row[:next_index])}
         # Special case next_index and rightward
         row_dict['next'] = [v.strip() for v in row[next_index:] if v.strip()]
         # TODO: enforce invariants on data presence more generally ( json included )
-        if not row_dict['Task']:
-            dropped_rows += 1
+        # Skip rows without a task name or tasks called Task (assume that's a repeated header row).
+        if not row_dict['Task'] or row_dict['Task'] == 'Task':
             continue
         processed_data.append(row_dict)
 
-    if dropped_rows:
-        notifications.append(Notification(Severity.INFO, f"{dropped_rows} rows were dropped due to missing content"))
     return processed_data
 
 def try_csv(data, notifications, delimiter):
