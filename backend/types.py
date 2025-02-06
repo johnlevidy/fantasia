@@ -1,3 +1,4 @@
+from collections import defaultdict
 from enum import StrEnum, auto
 
 # Graph nodes are Tasks.
@@ -49,3 +50,33 @@ class Edge(StrEnum):
     weight   = auto()  # int; the weight of the edge, based on the ancestor task estimate.
     slack    = auto()  # int; the number of business days difference between the task's end date and the start of the next. Assigned to edges.
     critical = auto()  # bool; True if this edge is on the critical path.
+
+# Store all information about a project outside of the task graph itself.
+class Metadata:
+    # The person who does all the tasks nobody else has been assigned to.
+    ANON = "Anon"
+
+    def __init__(self):
+        self.teams      = {}
+        self.start_date = None
+        self.end_date   = None
+        self.people     = {}
+        self.names      = set(self.ANON)
+
+    def add_person(self, team, person):
+        # Get the person list for the team, creating it if needed. Check the team name is unique.
+        if team in self.teams:
+            person_list = self.teams[team]
+        else:
+            if team in self.names:
+                raise Exception(f"The team name \"{team}\" has already been used by another team or person")
+            person_list = []
+            self.teams[team] = person_list
+            self.names.add(team)
+
+        # Add the person to the list and the reverse index, first making sure the name is unique.
+        if person in self.names:
+            raise Exception(f"The person name \"{person}\" has already been used by another team or person")
+        self.names.add(person)
+        person_list.append(person)
+        self.people[person] = team

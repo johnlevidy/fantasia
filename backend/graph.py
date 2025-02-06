@@ -4,8 +4,8 @@ import networkx as nx
 from networkx import NetworkXNoCycle
 
 from .notification import Notification, Severity
-from .dateutil import busdays_between, compare_busdays, busdays_offset
-from .types import *
+from .dateutil import busdays_between, busdays_offset, compare_busdays, parse_date
+from .types import Task, Edge, Metadata
 
 # "Config".
 # Threshold for tasks starting 'soon'.
@@ -23,57 +23,51 @@ status_normalization = {
 }
 
 # Build a networkx graph out of the parsed content
-def build_graph(task_rows):
-    # A task with a special name of "Start" may set a start date for the whole graph.
-    # If set, we'll allow relative start and end dates (in the form "+N").
-    project_start_date = None
-
+def build_graph(task_rows, metadata):
     tasks = {}
     edges = []
     for task_row in task_rows:
+        # Get a field from the row, returning the default if it's missing or empty.
+        def get_field(field, default):
+            if not field in task_row or task_row[field] == '':
+                return default
+            return task_row[field].strip()
+
         # Utility to get dates for the task; allow offsets from the project start, if set.
         def get_date(date_name):
-            if date_name in task_row:
-                d = task_row[date_name].strip()
-                if d == '':
-                    return None
-                elif project_start_date is not None and d.startswith('+'):
-                    return busdays_offset(project_start_date, int(d)) # Relative date.
-                else:
-                    return datetime.strptime(d, "%Y-%m-%d").date() # Absolute date.
-            else:
+            d = get_field(date_name, None)
+            if d is None:
                 return None
-
-        # Does this task set a start date for the project?
-        # TODO move this to Metadata.
-        task_name = task_row['Task']
-        if task_name == 'Start':
-            project_start_date = get_date('StartDate')
-            continue # Skip this task.
+            if metadata.start_date is not None and d.startswith('+'):
+                return busdays_offset(metadata.start_date, int(d)) # Relative date.
+            else:
+                return parse_date(d) # Absolute date.
 
         # Allocate a new Task and fill in the basic fields.
+        task_name = task_row['Task']
         task = Task(task_name)
         tasks[task_name] = task
         task.start_date = get_date('StartDate')
         task.end_date   = get_date('EndDate')
-        task.desc       = task_row['Description'] if 'Description' in task_row else ''
+        task.desc       = get_field('Description', '')
 
         # The estimate for this task.
         # TODO allow strings like 1w, 2m etc.
         default_estimate = 5
-        if 'Estimate' in task_row:
-            task.estimate = int(task_row['Estimate'])
-        else:
+        estimate = get_field('Estimate', '')
+        if estimate == '':
             task.estimate     = default_estimate
             task.gen_estimate = True
+        else:
+            task.estimate = int(estimate)
 
         # Status.
-        task.user_status = task_row['Status'] if 'Status' in task_row else 'not started'
+        task.user_status = get_field('Status', 'not started')
         task.status = status_normalization.get(task.user_status, task.user_status)
 
         # Assignees.
         if 'Assignee' in task_row:
-            task.assigned = [a.strip() for a in task_row['Assignee'].split(',') if len(a.strip()) > 0]
+            task.assigned = [a.strip() for a in get_field('Assignee', '').split(',') if len(a.strip()) > 0]
 
         # Store edges.
         for next_task in task_row['next']:
@@ -97,7 +91,7 @@ def build_graph(task_rows):
     return G
 
 # Populate start and end dates for all tasks in the graph that don't already have them.
-def populate_dates(G: nx.Graph):
+def populate_dates(G, metadata):
     # We'll do this in a couple of steps. First, back propagate dates (so start dates can
     # be based on end date - estimate, and end dates can be based on start dates of
     # successor tasks). Then, forward propagate using today's date as a default start for
@@ -107,10 +101,14 @@ def populate_dates(G: nx.Graph):
     # Step 1 - backwards propagation.
     topo = list(nx.topological_sort(G))
     for task in reversed(topo):
-        # If this task doesn't have an end date, we can't set a start date, nor can
-        # we reason about dates for ancestor tasks. Skip it.
+        # If this task doesn't have an end date, use the metadata end date, if there
+        # is one. If there isn't, we can't reason about its dates nor dates for 
+        # ancestor tasks, so we'll skip it.
         if task.end_date is None:
-            continue
+            if metadata.end_date is None:
+                continue
+            task.end_date = metadata.end_date
+            task.gen_end  = True
 
         # If it doesn't have a start date, set it based on the estimate.
         if task.start_date is None:
@@ -155,7 +153,6 @@ def calculate_jit_dates(G: nx.Graph):
     for task in reversed(list(nx.topological_sort(G))):
         # If this task doesn't already have a JIT end date, set it to the current end date.
         # Then set the JIT start based on the estimate.
-        print(f"{task} : {type(task.jit_end)} {task.jit_end} / {type(task.end_date)} {task.end_date}")
         if not task.jit_end:
             task.jit_end = task.end_date
         task.jit_start = busdays_offset(task.jit_end, -task.estimate)
@@ -185,7 +182,7 @@ def decorate_tasks(G: nx.Graph):
 
         # Calculate slack between this task and all successor tasks.
         # Tasks following in progress or blocked tasks that are not started are "up next".
-        live = task.status == 'in progress' or task# == 'blocked'
+        live = task.status == 'in progress' or task.status == 'blocked'
         for succ in G.successors(task):
             G.edges[task, succ][Edge.slack] = busdays_between(task.end_date, succ.start_date)
             if live and succ.status == 'not started':
@@ -264,9 +261,14 @@ def check_start_dates(G: nx.Graph, notifications: list[Notification], buffer_day
         if start_date <= alert_date and (status != 'in progress' and status != 'done'):
             notifications.append(Notification(Severity.INFO, f"Task {task} starts on {start_date}, which is within {buffer_days} business days from today ({today_date}). Status: {status}. Check readiness."))
 
-def compute_graph_metrics(parsed_content, notifications):
+def compute_graph_metrics(parsed_content, metadata, notifications):
+    # The metadata may specify a start date, but if it doesn't, set it to today.
+    if metadata.start_date is None:
+        # TODO use the user's timezone.
+        metadata.start_date = datetime.now().date()
+
     # Check for cycles before running graph algorithms
-    G = build_graph(parsed_content)
+    G = build_graph(parsed_content, metadata)
 
     cycle = find_cycle(G)
     if cycle:
@@ -279,7 +281,7 @@ def compute_graph_metrics(parsed_content, notifications):
 
     # Dates and decorations.
     # Do dates first so the decorators have something to work with.
-    populate_dates(G)
+    populate_dates(G, metadata)
     calculate_jit_dates(G)
     decorate_tasks(G)
 
