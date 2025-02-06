@@ -47,11 +47,11 @@ def build_graph(task_rows, metadata):
         task_name = task_row['Task']
         task = Task(task_name)
         tasks[task_name] = task
-        task.start_date = get_date('StartDate')
-        task.end_date   = get_date('EndDate')
         task.desc       = get_field('Description', '')
 
-        # The estimate for this task.
+        # Start date, end date, and estimate. If we have at least one date and an estimate,
+        # we can set the other date. We need an estimate, though, so default it if it's
+        # not present.
         # TODO allow strings like 1w, 2m etc.
         default_estimate = 5
         estimate = get_field('Estimate', '')
@@ -60,6 +60,16 @@ def build_graph(task_rows, metadata):
             task.gen_estimate = True
         else:
             task.estimate = int(estimate)
+
+        task.start_date = get_date('StartDate')
+        task.end_date   = get_date('EndDate')
+        if task.start_date is None:
+            if task.end_date is not None:
+                task.start_date = busdays_offset(task.end_date, -task.estimate)
+                task.gen_start  = True
+        elif task.end_date is None:
+            task.end_date = busdays_offset(task.start_date, task.estimate)
+            task.gen_end  = True
 
         # Status.
         task.user_status = get_field('Status', 'not started')
@@ -110,7 +120,10 @@ def populate_dates(G, metadata):
             task.end_date = metadata.end_date
             task.gen_end  = True
 
-        # If it doesn't have a start date, set it based on the estimate.
+        # If it doesn't have a start date, set it now based on the estimate.
+        # Note - this is done here since the end date could have been set from 
+        # a successor task; this sets start date based on end date being set as
+        # a consequence of the above logic as well as the below.
         if task.start_date is None:
             task.start_date = busdays_offset(task.end_date, -task.estimate)
             task.gen_start  = True
