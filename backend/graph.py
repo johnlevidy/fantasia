@@ -7,6 +7,10 @@ from networkx import NetworkXNoCycle
 from .notification import Notification, Severity
 from .dateutil import busdays_between, compare_busdays, busdays_offset
 
+# "Config".
+# Threshold for tasks starting 'soon'.
+soon_threshold = 2
+
 # Graph node and edge attributes this package uses.
 class Attr(StrEnum):
     id           = auto() # int; a unique id for the task.
@@ -29,6 +33,7 @@ class Attr(StrEnum):
     busdays      = auto() # int; the number of business days between the task start and end.
     active       = auto() # bool; if True, this task has started but hasn't reached its end date.
     late         = auto() # bool; if True, this task's end date has passed and it's not done.
+    soon         = auto() # bool; if True, this task starts in the next few days.
     up_next      = auto() # bool; if True, this task immediately follows one in progress.
     critical     = auto() # bool; if True, this task (and edge) is on the critical path for the project.
     weight       = auto() # int; the weight of the edge, based on the ancestor task estimate.
@@ -96,6 +101,9 @@ def build_graph(tasks):
             Attr.desc         : task['Description'] if 'Description' in task else '?',
             Attr.status       : status,
             Attr.user_status  : user_status,
+            Attr.active       : False,
+            Attr.late         : False,
+            Attr.soon         : False,
             Attr.up_next      : False,
             Attr.critical     : False
         })
@@ -147,13 +155,10 @@ def populate_dates(G: nx.Graph):
                 pred[Attr.gen_end]  = True
 
     # Step 2 - forwards propagation.
-    # Tasks without predecessors will default to the project start date, which is the
-    # earliest start date of any task. Default to today's date if no task has a start
-    # date.
-    project_start_date = min([x[1] for x in G.nodes(data='start_date') if x[1] is not None])
-    if project_start_date is None:
-        # TODO should match the user's timezone.
-        project_start_date = datetime.now().date()
+    # Tasks without predecessors will default to today's date, since that's the earliest
+    # they _could_ start, at this point.
+    # TODO should match the user's timezone.
+    project_start_date = datetime.now().date()
 
     for task_name in topo:
         task = G.nodes[task_name]
@@ -202,11 +207,16 @@ def decorate_tasks(G: nx.Graph):
     today = datetime.now().date()
 
     for task_name, task in G.nodes(data=True):
-        task[Attr.active]  = task[Attr.start_date] <= today <= task[Attr.end_date]
-        task[Attr.late]    = task[Attr.end_date] < today and task[Attr.status] != 'done'
         task[Attr.busdays] = busdays_between(task[Attr.start_date], task[Attr.end_date])
         task[Attr.floot]   = busdays_between(task[Attr.end_date], task[Attr.jit_end])
         task[Attr.buffer]  = task[Attr.busdays] - task[Attr.estimate]
+        if task[Attr.start_date] > today:
+            task[Attr.soon] = busdays_between(today, task[Attr.start_date]) <= soon_threshold
+        else:
+            if today <= task[Attr.end_date]:
+                task[Attr.active] = True
+            else:
+                task[Attr.late] = True
 
         # Calculate slack between this task and all successor tasks.
         # Tasks following in progress or blocked tasks that are not started are "up next".
@@ -226,7 +236,6 @@ def decorate_tasks(G: nx.Graph):
 
 # Returns True if there are any bad start / end dates
 def find_bad_start_end_dates(G: nx.Graph, notifications):
-    threshold = 2
     to_return = False
     for task_name, task in G.nodes(data=True):
         if not task[Attr.start_date] or not task[Attr.end_date]:
@@ -237,10 +246,10 @@ def find_bad_start_end_dates(G: nx.Graph, notifications):
         # If the estimate is larger than the number of business dates that the task spans, flag it.
         # TODO account for the number of people assigned to the task as well?
         difference = compare_busdays(task[Attr.start_date], task[Attr.end_date], task[Attr.estimate])
-        if difference > threshold:
+        if difference > soon_threshold:
             notifications.append(Notification(Severity.INFO, 
                 f"Item [{task_name}] has an estimate inconsistent with start ({task[Attr.start_date]}) and end ({task[Attr.end_date]}). "
-                f"[Estimate: {task[Attr.estimate]}, Difference: {difference}, Threshold: {threshold}]"))
+                f"[Estimate: {task[Attr.estimate]}, Difference: {difference}, Threshold: {soon_threshold}]"))
             to_return = True
     return to_return
 

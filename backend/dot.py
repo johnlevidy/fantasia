@@ -37,11 +37,23 @@ def dot_task(task_name, task):
     estimate       = style_text(f"{task[Attr.estimate]}d  ({task[Attr.buffer]}d buf)", italic = task[Attr.gen_estimate])
     estimate_color = 'lightgray' if task[Attr.gen_estimate] else 'white'
 
+    border_width = 1
+    border_color = 'black'
+    if task[Attr.late]:
+        border_width = 3
+        border_color = 'red'
+    elif task[Attr.active]:
+        border_width = 3
+        border_color = 'lightgreen'
+    elif task[Attr.soon]:
+        border_width = 3
+        border_color = 'lightyellow'
+
     # Milestones are tasks with zero days estimated effort.
     if task[Attr.estimate] == 0:
         return (
             f"{task[Attr.id]} [label=<"
-            f"<table border='1' cellborder='1'><tr><td>{title}</td></tr>"
+            f"<table border='1' cellborder='1' cellspacing='0'><tr><td>{title}</td></tr>"
             f"<tr><td bgcolor='{end_color}'>{end_date}</td></tr>"
             f"<tr><td>{wrap_desc}</td></tr></table>"
             f">];"
@@ -52,30 +64,27 @@ def dot_task(task_name, task):
         case 'done':
             return (
                 f"{task[Attr.id]} [label=<"
-                f"<table border='1' cellborder='1'><tr><td bgcolor='lightblue'>{title} (done)</td></tr>"
-                f"<tr><td bgcolor='{end_color}'>{end_date}</td></tr></table>"
+                f"<table border='1' color='lightblue' cellborder='1' cellspacing='0'><tr><td color='black' bgcolor='lightblue'>{title} (done)</td></tr>"
+                f"<tr><td color='black' bgcolor='{end_color}'>{end_date}</td></tr></table>"
                 f">];"
             )
         case 'not started':
-            up_next_state = '(up next)' if task[Attr.up_next] else ''
             return (
                 f"{task[Attr.id]} [label=<"
-                f"<table border='1' cellborder='1'><tr><td colspan='2'>{title} {up_next_state}</td></tr>"
-                f"<tr><td bgcolor='{start_color}'>{start_date}</td><td bgcolor='{end_color}'>{end_date}</td></tr>"
-                f"<tr><td>{task[Attr.assignee]}</td><td bgcolor='{estimate_color}'>{estimate}</td></tr>"
-                f"<tr><td colspan='2'>{wrap_desc}</td></tr></table>"
+                f"<table border='{border_width}' color='{border_color}' cellborder='1' cellspacing='0'><tr><td color='black' colspan='2'>{title}</td></tr>"
+                f"<tr><td color='black' bgcolor='{start_color}'>{start_date}</td><td color='black' bgcolor='{end_color}'>{end_date}</td></tr>"
+                f"<tr><td color='black'>{task[Attr.assignee]}</td><td color='black' bgcolor='{estimate_color}'>{estimate}</td></tr>"
+                f"<tr><td color='black' colspan='2'>{wrap_desc}</td></tr></table>"
                 f">];"
             )
         case _:
-            name_color = 'red' if task[Attr.late] else 'lightgreen' if task[Attr.active] else 'white'
-            name_state = '(late)' if task[Attr.late] else '(active)' if task[Attr.active] else ''
             status_color = 'red' if task[Attr.status] == 'blocked' else 'lightgreen' if task[Attr.status] == 'in progress' else 'white'
             return (
                 f"{task[Attr.id]} [label=<"
-                f"<table border='1' cellborder='1'><tr><td colspan='3' bgcolor='{name_color}'>{title} {name_state}</td></tr>"
-                f"<tr><td bgcolor='{start_color}'>{start_date}</td><td bgcolor='{status_color}'>{task[Attr.user_status]}</td><td bgcolor='{end_color}'>{end_date}</td></tr>"
-                f"<tr><td colspan='2'>{task[Attr.assignee]}</td><td bgcolor='{estimate_color}'>{estimate}</td></tr>"
-                f"<tr><td colspan='3'>{wrap_desc}</td></tr></table>"
+                f"<table border='{border_width}' color='{border_color}' cellborder='1' cellspacing='0'><tr><td color='black' colspan='3' bgcolor='{status_color}'>{title}</td></tr>"
+                f"<tr><td color='black' bgcolor='{start_color}'>{start_date}</td><td color='black' bgcolor='{status_color}'>{task[Attr.user_status]}</td><td color='black' bgcolor='{end_color}'>{end_date}</td></tr>"
+                f"<tr><td color='black' colspan='2'>{task[Attr.assignee]}</td><td color='black' bgcolor='{estimate_color}'>{estimate}</td></tr>"
+                f"<tr><td color='black' colspan='3'>{wrap_desc}</td></tr></table>"
                 f">];"
             )
 
