@@ -14,10 +14,10 @@ def test_cycle():
     cycle = find_cycle(build_graph(tasks))
     print(cycle)
     assert cycle
-    assert cycle[0][0] == 'Order Corn Seed'
-    assert cycle[0][1] == 'Plan Maze'
-    assert cycle[1][1] == 'Order Corn Seed'
-    assert cycle[1][0] == 'Plan Maze'
+    assert cycle[0][0].name == 'Order Corn Seed'
+    assert cycle[0][1].name == 'Plan Maze'
+    assert cycle[1][1].name == 'Order Corn Seed'
+    assert cycle[1][0].name == 'Plan Maze'
 
 def test_find_start_next_before_end():
     tasks = [
