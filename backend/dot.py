@@ -49,6 +49,12 @@ def dot_task(task):
         border_width = 3
         border_color = 'lightyellow'
 
+    if len(task.assignees) > 0:
+        assignees = ', '.join(task.assignees)
+    else:
+        assignees = ', '.join(task.assigned)
+    assignee_color = 'pink' if task.contended else 'white'
+
     # Milestones are tasks with zero days estimated effort.
     if task.estimate == 0:
         return (
@@ -73,7 +79,7 @@ def dot_task(task):
                 f"{task.id} [label=<"
                 f"<table border='{border_width}' color='{border_color}' cellborder='1' cellspacing='0'><tr><td color='black' colspan='2'>{title}</td></tr>"
                 f"<tr><td color='black' bgcolor='{start_color}'>{start_date}</td><td color='black' bgcolor='{end_color}'>{end_date}</td></tr>"
-                f"<tr><td color='black'>{','.join(task.assigned)}</td><td color='black' bgcolor='{estimate_color}'>{estimate}</td></tr>"
+                f"<tr><td color='black' bgcolor='{assignee_color}'>{assignees}</td><td color='black' bgcolor='{estimate_color}'>{estimate}</td></tr>"
                 f"<tr><td color='black' colspan='2'>{wrap_desc}</td></tr></table>"
                 f">];"
             )
@@ -83,7 +89,7 @@ def dot_task(task):
                 f"{task.id} [label=<"
                 f"<table border='{border_width}' color='{border_color}' cellborder='1' cellspacing='0'><tr><td color='black' colspan='3' bgcolor='{status_color}'>{title}</td></tr>"
                 f"<tr><td color='black' bgcolor='{start_color}'>{start_date}</td><td color='black' bgcolor='{status_color}'>{task.user_status}</td><td color='black' bgcolor='{end_color}'>{end_date}</td></tr>"
-                f"<tr><td color='black' colspan='2'>{','.join(task.assigned)}</td><td color='black' bgcolor='{estimate_color}'>{estimate}</td></tr>"
+                f"<tr><td color='black' bgcolor='{assignee_color}' colspan='2'>{assignees}</td><td color='black' bgcolor='{estimate_color}'>{estimate}</td></tr>"
                 f"<tr><td color='black' colspan='3'>{wrap_desc}</td></tr></table>"
                 f">];"
             )

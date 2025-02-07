@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 import numpy as np
 import networkx as nx
@@ -6,6 +7,7 @@ from networkx import NetworkXNoCycle
 from .notification import Notification, Severity
 from .dateutil import busdays_between, busdays_offset, compare_busdays, parse_date
 from .types import Task, Edge, Metadata
+from .scheduler import schedule_graph, no_op_scheduler, AssigningScheduler, GreedyLevelingScheduler
 
 # "Config".
 # Threshold for tasks starting 'soon'.
@@ -49,27 +51,31 @@ def build_graph(task_rows, metadata):
         tasks[task_name] = task
         task.desc       = get_field('Description', '')
 
-        # Start date, end date, and estimate. If we have at least one date and an estimate,
-        # we can set the other date. We need an estimate, though, so default it if it's
-        # not present.
-        # TODO allow strings like 1w, 2m etc.
+        # Start date, end date, and estimate.
+        # TODO allow strings like 1w, 2m etc for the estimate.
         default_estimate = 5
-        estimate = get_field('Estimate', '')
-        if estimate == '':
-            task.estimate     = default_estimate
-            task.gen_estimate = True
+        task.start_date  = get_date('StartDate')
+        task.end_date    = get_date('EndDate')
+        estimate         = get_field('Estimate', '')
+        task.estimate    = None if estimate == '' else int(estimate) 
+        if task.start_date is None and task.end_date is None:
+            # No dates - default the estimate if there isn't one.
+            if task.estimate is None:
+                task.estimate     = default_estimate
+                task.gen_estimate = True
+        elif task.start_date is not None and task.end_date is not None:
+            # Both dates set - set the estimate to the task span if needed.
+            if task.estimate is None:
+                task.estimate = busdays_between(task.start_date, task.end_date)
         else:
-            task.estimate = int(estimate)
-
-        task.start_date = get_date('StartDate')
-        task.end_date   = get_date('EndDate')
-        if task.start_date is None:
-            if task.end_date is not None:
+            # Only one date is set; set the other based on it and the estimate.
+            if task.estimate is None:
+                task.estimate     = default_estimate
+                task.gen_estimate = True
+            if task.start_date is None:
                 task.start_date = busdays_offset(task.end_date, -task.estimate)
-                task.gen_start  = True
-        elif task.end_date is None:
-            task.end_date = busdays_offset(task.start_date, task.estimate)
-            task.gen_end  = True
+            if task.end_date is None:
+                task.end_date = busdays_offset(task.start_date, task.estimate)
 
         # Status.
         task.user_status = get_field('Status', 'not started')
@@ -99,64 +105,6 @@ def build_graph(task_rows, metadata):
             pass
 
     return G
-
-# Populate start and end dates for all tasks in the graph that don't already have them.
-def populate_dates(G, metadata):
-    # We'll do this in a couple of steps. First, back propagate dates (so start dates can
-    # be based on end date - estimate, and end dates can be based on start dates of
-    # successor tasks). Then, forward propagate using today's date as a default start for
-    # any tasks that don't have either start dates or ancestors. The forward step is 
-    # guaranteed to set start/end dates for any tasks that don't already have them.
-
-    # Step 1 - backwards propagation.
-    topo = list(nx.topological_sort(G))
-    for task in reversed(topo):
-        # If this task doesn't have an end date, use the metadata end date, if there
-        # is one. If there isn't, we can't reason about its dates nor dates for 
-        # ancestor tasks, so we'll skip it.
-        if task.end_date is None:
-            if metadata.end_date is None:
-                continue
-            task.end_date = metadata.end_date
-            task.gen_end  = True
-
-        # If it doesn't have a start date, set it now based on the estimate.
-        # Note - this is done here since the end date could have been set from 
-        # a successor task; this sets start date based on end date being set as
-        # a consequence of the above logic as well as the below.
-        if task.start_date is None:
-            task.start_date = busdays_offset(task.end_date, -task.estimate)
-            task.gen_start  = True
-
-        # Propagate dates through the graph. Tasks without an end date will be assigned one;
-        # if the gen_end flag is already set on the task then the end date will be updated
-        # to match the earliest start date of successor tasks.
-        for pred in G.predecessors(task):
-            if pred.end_date is None or (pred.gen_end and task.start_date < pred.end_date):
-                pred.end_date = task.start_date
-                pred.gen_end  = True
-
-    # Step 2 - forwards propagation.
-    # Tasks without predecessors will default to today's date, since that's the earliest
-    # they _could_ start, at this point.
-    # TODO should match the user's timezone.
-    project_start_date = datetime.now().date()
-    for task in topo:
-        # If this task doesn't have a start_date it must be because it's a root task; default
-        # it to the project start date.
-        if task.start_date is None:
-            task.start_date = project_start_date
-            task.gen_start  = True
-
-        # If the task doesn't have an end date, set it based on the estimate.
-        if task.end_date is None:
-            task.end_date = busdays_offset(task.start_date, task.estimate)
-            task.gen_end  = True
-
-        for succ in G.successors(task):
-            if succ.start_date is None or (succ.gen_start and task.end_date > succ.start_date):
-                succ.start_date = task.end_date
-                succ.gen_start  = True
 
 def calculate_jit_dates(G: nx.Graph):
     # Similar to the date propagation, but in this case we start with the last task and force
@@ -292,9 +240,40 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
     parallelism_ratio = total_length / critical_path_length
     notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
-    # Dates and decorations.
-    # Do dates first so the decorators have something to work with.
-    populate_dates(G, metadata)
+    # Schedule the tasks, if we have resource metadata.
+    if len(metadata.teams) == 0:
+        scheduler = no_op_scheduler
+    else:
+        scheduler = GreedyLevelingScheduler()
+
+    schedule_graph(G, scheduler, metadata)
+
+    if isinstance(scheduler, AssigningScheduler):
+        # Flag contended tasks.
+        calendar = scheduler.get_calendar()
+        for date, people in calendar.cal.items():
+            for person, tasks in people.items():
+                if len(tasks) > 1:
+                    for task in tasks:
+                        task.contended = True
+
+        # Print out the schedule and count how many days (and task-days) each person is working.
+        days_alloc  = defaultdict(int)
+        tasks_alloc = defaultdict(int)
+        for date in sorted(calendar.cal.keys()):
+            for person, tasks in calendar.cal[date].items():
+                    days_alloc[person]  += 1
+                    tasks_alloc[person] += len(tasks)
+                    print(f"{date} {person}: {tasks}")
+
+        # Print out the number of days allocated per person.
+        for person in sorted(days_alloc.keys()):
+            if tasks_alloc[person] > days_alloc[person]:
+                print(f"{person} - working {days_alloc[person]}d, overallocated by {tasks_alloc[person] - days_alloc[person]}d")
+            else:
+                print(f"{person} - working {days_alloc[person]}d")
+
+    # Other dates and decorations.
     calculate_jit_dates(G)
     decorate_tasks(G)
 

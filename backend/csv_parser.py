@@ -38,23 +38,25 @@ def csv_string_to_data(csv_string, notifications, delimiter):
         # %TEAM,<team name>,<person 1>,<person 2>,....
         # %START,start date
         # %END,end date
-        if row[0] == '%TEAM':
-            if len(row) < 3:
-                raise Exception("Invalid %TEAM declaration; skipping")
-            team = row[1].strip()
-            [m.add_person(team, person.strip()) for person in row[2:] if person.strip()]
-            continue 
-        elif row[0] == '%START':
-            if len(row) < 2:
-                raise Exception("Invalid %START declaration; skipping")
-            m.start_date = parse_date(row[1])
-            continue
-        elif row[0] == '%END':
-            print('END')
-            if len(row) < 2:
-                raise Exception("Invalid %END declaration; skipping")
-            m.end_date = parse_date(row[1])
-            continue
+        # %MINSLACK,slack   - how many days to leave between tasks when scheduling.
+        match row[0]:
+            case '%TEAM':
+                if len(row) < 3: raise Exception("Invalid %TEAM declaration; skipping")
+                team = row[1].strip()
+                [m.add_person(team, person.strip()) for person in row[2:] if person.strip()]
+                continue 
+            case '%START':
+                if len(row) < 2: raise Exception("Invalid %START declaration; skipping")
+                m.start_date = parse_date(row[1])
+                continue
+            case '%END':
+                if len(row) < 2: raise Exception("Invalid %END declaration; skipping")
+                m.end_date = parse_date(row[1])
+                continue
+            case '%MINSLACK':
+                if len(row) < 2: raise Exception("Invalid %MINSLACK declaration; skipping")
+                m.min_slack = int(row[1])
+                continue
 
         # General case before the next_index
         row_dict = {k: v.strip() for k, v in zip(headers[:next_index], row[:next_index])}
