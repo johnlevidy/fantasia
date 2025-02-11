@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+from backend.types import Metadata
 from backend.graph import compute_dag_metrics, find_cycle, find_bad_start_end_dates, build_graph, find_start_next_before_end, check_start_dates
 
 def test_cycle():
@@ -11,13 +12,13 @@ def test_cycle():
         {'Task': 'Cut Corn to Shape', 'Estimate': '3', 'next': ['Done']},
         {'Task': 'Done', 'Estimate': '0', 'next': []}
     ]
-    cycle = find_cycle(build_graph(tasks))
+    cycle = find_cycle(build_graph(tasks, Metadata()))
     print(cycle)
     assert cycle
-    assert cycle[0][0] == 'Order Corn Seed'
-    assert cycle[0][1] == 'Plan Maze'
-    assert cycle[1][1] == 'Order Corn Seed'
-    assert cycle[1][0] == 'Plan Maze'
+    assert cycle[0][0].name == 'Order Corn Seed'
+    assert cycle[0][1].name == 'Plan Maze'
+    assert cycle[1][1].name == 'Order Corn Seed'
+    assert cycle[1][0].name == 'Plan Maze'
 
 def test_find_start_next_before_end():
     tasks = [
@@ -25,14 +26,14 @@ def test_find_start_next_before_end():
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
     notifications = []
-    find_start_next_before_end(build_graph(tasks), notifications)
+    find_start_next_before_end(build_graph(tasks, Metadata()), notifications)
     assert len(notifications) == 1
     assert "[UniqueNameA] has an end date after next task" in notifications[0].message
     tasks = [
         {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-25', 'EndDate': '2022-05-25', 'next': []},
     ]
-    find_start_next_before_end(build_graph(tasks), notifications)
+    find_start_next_before_end(build_graph(tasks, Metadata()), notifications)
     notifications = []
     assert not notifications
 
@@ -42,25 +43,25 @@ def test_find_start_next_before_end():
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
     notifications = []
-    assert find_start_next_before_end(build_graph(tasks), notifications)
+    assert find_start_next_before_end(build_graph(tasks, Metadata()), notifications)
     assert '[UniqueNameA] has an end date after' in notifications[0].message
     tasks = [
         {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': ['UniqueNameB']},
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-25', 'EndDate': '2022-06-25', 'next': []},
     ]
-    assert not find_start_next_before_end(build_graph(tasks), notifications)
+    assert not find_start_next_before_end(build_graph(tasks, Metadata()), notifications)
 
 def test_find_bad_start_end_dates():
     tasks = [
         {'Task': 'A', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
     notifications = []
-    assert not find_bad_start_end_dates(build_graph(tasks), notifications)
+    assert not find_bad_start_end_dates(build_graph(tasks, Metadata()), notifications)
     tasks = [
         {'Task': 'UniqueNameA', 'Estimate': '3', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
         {'Task': 'UniqueNameB', 'Estimate': '20', 'StartDate': '2022-05-22', 'EndDate': '2022-05-25', 'next': []},
     ]
-    assert find_bad_start_end_dates(build_graph(tasks), notifications)
+    assert find_bad_start_end_dates(build_graph(tasks, Metadata()), notifications)
     assert 'UniqueNameB' in notifications[0].message
 
 def test_check_start_dates():
@@ -68,10 +69,10 @@ def test_check_start_dates():
 
     notifications = []
     today_date = datetime.strptime('2025-01-13', "%Y-%m-%d").date()
-    check_start_dates(build_graph(tasks), notifications, 3, today_date)
+    check_start_dates(build_graph(tasks, Metadata()), notifications, 3, today_date)
 
     today_date = datetime.strptime('2025-02-13', "%Y-%m-%d").date()
-    check_start_dates(build_graph(tasks), notifications, 3, today_date)
+    check_start_dates(build_graph(tasks, Metadata()), notifications, 3, today_date)
     assert notifications
     
 def test_compute_dag_metrics():
@@ -85,8 +86,8 @@ def test_compute_dag_metrics():
     ]
 
     # Execute the function under test
-    total_work, longest_path = compute_dag_metrics(build_graph(tasks))
-    assert not find_cycle(build_graph(tasks))
+    total_work, longest_path = compute_dag_metrics(build_graph(tasks, Metadata()))
+    assert not find_cycle(build_graph(tasks, Metadata()))
 
     assert total_work == 31
     assert longest_path == 28
@@ -105,6 +106,6 @@ def test_compute_dag_metrics():
         {'Task': 'Project Completed', 'Estimate': '0', 'next': []}
     ]
 
-    total_work, longest_path = compute_dag_metrics(build_graph(tasks))
+    total_work, longest_path = compute_dag_metrics(build_graph(tasks, Metadata()))
     assert total_work == 50
     assert longest_path ==  30

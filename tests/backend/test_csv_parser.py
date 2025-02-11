@@ -20,13 +20,13 @@ extra_rows = """id,EndDate,StartDate,Task,Description,Estimate,Assignee,Status,n
 
 def test_success():
     error_string = []
-    data = try_csv(corn_plan, error_string, delimiter = ",")
+    data, metadata = try_csv(corn_plan, error_string, delimiter = ",")
     assert(len(data) == 5)
     assert(len(data[0]['next']) == 2)
 
 def test_drop_extra_rows():
     error_string = []
-    data = try_csv(extra_rows, error_string, delimiter = ",")
+    data, metadata = try_csv(extra_rows, error_string, delimiter = ",")
     assert(len(data) == 1)
     assert(len(data[0]['next']) == 2)
 

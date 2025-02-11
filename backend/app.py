@@ -1,5 +1,6 @@
-from .notification import Notification, Severity
 from flask import Flask, request, jsonify, render_template
+from traceback import format_exc
+from .notification import Notification, Severity
 from .json_parser import try_json
 from .csv_parser import try_csv
 from .graph import compute_dag_metrics, compute_graph_metrics
@@ -18,21 +19,21 @@ def home():
 # generated
 def parse_to_python(content):
     json_notifications = []
-    maybe_parsed_content = try_json(content, json_notifications)
+    maybe_parsed_content, metadata = try_json(content, json_notifications)
     if maybe_parsed_content:
-        return maybe_parsed_content, json_notifications
+        return maybe_parsed_content, metadata, json_notifications
 
     csv_notifications = []
-    maybe_parsed_content = try_csv(content, csv_notifications, ',')
+    maybe_parsed_content, metadata = try_csv(content, csv_notifications, ',')
     if maybe_parsed_content:
-        return maybe_parsed_content, csv_notifications
+        return maybe_parsed_content, metadata, csv_notifications
 
     tsv_notifications = []
-    maybe_parsed_content = try_csv(content, tsv_notifications, '\t')
+    maybe_parsed_content, metadata = try_csv(content, tsv_notifications, '\t')
     if maybe_parsed_content:
-        return maybe_parsed_content, tsv_notifications
+        return maybe_parsed_content, metadata, tsv_notifications
 
-    return None, json_notifications + csv_notifications + tsv_notifications
+    return None, None, json_notifications + csv_notifications + tsv_notifications
 
 @app.route('/process', methods=['POST'])
 def process():
@@ -41,11 +42,11 @@ def process():
     notifications: list[Notification] = []
     content = data['content']
     
-    parsed_content, notifications = parse_to_python(content)
+    parsed_content, metadata, notifications = parse_to_python(content)
     
     try:
         verify_schema(parsed_content, notifications)
-        G = compute_graph_metrics(parsed_content, notifications)
+        G = compute_graph_metrics(parsed_content, metadata, notifications)
         svg = generate_svg_graph(G)
         response = {
             "image": svg,
@@ -54,6 +55,11 @@ def process():
         return jsonify(response)
     
     except Exception as e:
+        # For debugging convenience...
+        print(f"Caught exception {e}")
+        print(format_exc(e))
+
+        # Let the client know.
         return jsonify({'message': str(e), 'notifications': [n.to_dict() for n in notifications] }), 500
 
 if __name__ == '__main__':
