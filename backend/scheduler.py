@@ -191,7 +191,7 @@ def schedule_graph(G, scheduler, metadata):
     # could move the tasks themselves - in this case, push things into the future).
     for task in G.nodes:
         if task.start_date is not None and task.end_date is not None:
-            scheduler(G, task, False, metadata)
+            scheduler(G, task, True, metadata)
 
     # Now, back propagate dates (so end dates can be based on start dates of successor tasks).
     #
