@@ -7,7 +7,7 @@ from networkx import NetworkXNoCycle
 from .notification import Notification, Severity
 from .dateutil import busdays_between, busdays_offset, compare_busdays, parse_date
 from .types import Task, Edge, Metadata
-from .scheduler import schedule_graph, no_op_scheduler, AssigningScheduler, GreedyLevelingScheduler
+from .scheduler import schedule_graph, no_op_scheduler, AssigningScheduler, GreedyLevelingScheduler, MixedIntegerLinearProgrammingScheduler
 
 # "Config".
 # Threshold for tasks starting 'soon'.
@@ -244,7 +244,8 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
     if len(metadata.teams) == 0:
         scheduler = no_op_scheduler
     else:
-        scheduler = GreedyLevelingScheduler()
+        scheduler = MixedIntegerLinearProgrammingScheduler()
+        # scheduler = GreedyLevelingScheduler()
 
     schedule_graph(G, scheduler, metadata)
 
