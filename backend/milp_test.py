@@ -18,6 +18,7 @@ def create_metadata_from_scenario(scenario):
     m = Metadata()
     m.teams['All'] = scenario.people
     m.people = scenario.people
+    m.teams = {}
     # Make special team names from the specs
     for spec in scenario.tasks:
         if 'assignee_pool' in spec:

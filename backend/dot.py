@@ -49,10 +49,8 @@ def dot_task(task):
         border_width = 4
         border_color = 'lightyellow'
 
-    if len(task.assignees) > 0:
-        assignees = ', '.join(task.assignees)
-    else:
-        assignees = ', '.join(task.assigned)
+    if len(task.scheduler_assigned) > 0:
+        assignees = ', '.join(task.scheduler_assigned)
     assignee_color = 'pink' if task.contended else 'white'
 
     # Milestones are tasks with zero days estimated effort.
