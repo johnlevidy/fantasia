@@ -14,6 +14,16 @@ class TestScenario:
     expected_makespan: Optional[int] = None
     expected_infeasible: bool = False
 
+def create_metadata_from_scenario(scenario):
+    m = Metadata()
+    m.teams['All'] = scenario.people
+    m.people = scenario.people
+    # Make special team names from the specs
+    for spec in scenario.tasks:
+        if 'assignee_pool' in spec:
+            m.teams[':'.join(spec['assignee_pool'])] = spec['assignee_pool']
+    return m
+
 # Create a list of tasks from the task specification
 def create_tasks_from_specs(task_specs):
     tasks = {}
@@ -21,11 +31,12 @@ def create_tasks_from_specs(task_specs):
         task = Task(spec['name'])
         task.estimate = spec['estimate']
         if 'assigned' in spec:
-            task.assigned = spec['assigned']
+            task.user_assigned = spec['assigned']
         if 'latest_end' in spec:
             task.end_date = spec['latest_end']
         if 'assignee_pool' in spec:
-            task.assignee_pool = spec['assignee_pool']
+            # Assume metadata constructed this way
+            task.user_assigned = [':'.join(spec['assignee_pool'])]
         tasks[task.name] = task
     
     return tasks
@@ -35,11 +46,8 @@ def build_test_graph(scenario: TestScenario):
     G = nx.DiGraph()
     
     tasks = create_tasks_from_specs(scenario.tasks)
+    metadata = create_metadata_from_scenario(scenario)
 
-    for v in tasks.values():
-        if not v.assignee_pool:
-            v.assignee_pool = scenario.people
-    
     for task in tasks.values():
         G.add_node(task)
 
@@ -48,7 +56,7 @@ def build_test_graph(scenario: TestScenario):
         to_task = tasks[to_name]
         G.add_edge(from_task, to_task)
 
-    return G
+    return G, metadata
 
 def verify_results(test_case, scenario, results, makespan):
     if scenario.expected_infeasible:
@@ -148,8 +156,8 @@ def verify_results(test_case, scenario, results, makespan):
 # Test scenarios
 class TestScheduler(unittest.TestCase):
     def run_scenario(self, scenario):
-        G = build_test_graph(scenario)
-        results, ms = milp_schedule_graph(G, Metadata())
+        G, metadata = build_test_graph(scenario)
+        results, ms = milp_schedule_graph(G, metadata)
         verify_results(self, scenario, results, ms)
 
     def test_basic_single_person_assignment(self):

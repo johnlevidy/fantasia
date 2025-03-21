@@ -1,4 +1,5 @@
 import dataclasses
+import itertools
 from ortools.sat.python import cp_model
 import argparse
 
@@ -43,7 +44,7 @@ def milp_solve(G, tasks, person_to_person_id, task_to_id, person_id_to_person, i
     # Build constraints around who may be assigned to certain tasks
     for task_id, task in tasks.items():
         # No assignments exist yet
-        if not task.assigned:
+        if not task.scheduler_assigned:
             allowed_person_ids = [person_to_person_id[person] for person in task.assignee_pool]
             register_task_start_end(model, task_id, horizon, intervals, starts, ends, task, expanded_tasks) 
             assign_people_to_task(model, person_assignments, task_id, allowed_person_ids)
@@ -51,7 +52,7 @@ def milp_solve(G, tasks, person_to_person_id, task_to_id, person_id_to_person, i
 
         # N >= 1 assignments already exist
         subtasks = []
-        for i, person in enumerate(task.assigned):
+        for i, person in enumerate(task.scheduler_assigned):
             subtask_id = f"{task_id}_person_{i}"
             subtasks.append(subtask_id)
             subtask_id_to_task_id[subtask_id] = task_id
@@ -154,15 +155,33 @@ def milp_schedule_graph(G, metadata):
     id_to_task = dict()
     task_to_id = dict()
 
-    all_people = set() 
-    all_people = all_people.union(*[a.assigned for a in G])
-    all_people = all_people.union(*[a.assignee_pool for a in G])
-    all_people = all_people.union(metadata.people)
-
-    print(f"All people: {all_people}")
+    all_people = set(metadata.people) 
 
     person_id_to_person = dict()
     person_to_person_id = dict()
+
+    # ----------------------------------
+    # Build assignee_pools for each task
+    for v in G:
+        if not v.user_assigned:
+            v.assignee_pool = all_people
+            continue
+        # For each assignee I see, if it's a team, add the whole team to the pool
+        assignee_pool = []
+        for a in v.user_assigned:
+            if a in metadata.teams.keys():
+                assignee_pool.extend(metadata.teams[a])
+            # We already built a pool but now see a concrete assigned resource. 
+            # Not supported right now, to support this we should add a notion of 
+            # # of people on a project to target
+            if assignee_pool and a not in metadata.teams.keys():
+                raise Exception(f"FATA: task {v.name} contains a mix of team assignments and user assignments. Not supported. {v.user_assigned}")
+        # If I didn't build a pool, they must have all been direct assignments.
+        # Accept them all immediately
+        if not assignee_pool:
+            v.scheduler_assigned = v.user_assigned
+        # Note that this still works in the case of no team assignments
+        v.assignee_pool = assignee_pool
 
     # Build dense identifiers for people and tasks
     # for use in the optimization solver
@@ -174,7 +193,7 @@ def milp_schedule_graph(G, metadata):
         task_to_id[r.name] = i
     today = datetime.now().date()
 
-    # Sanitize inputs for the scheduler
+    # Build latest_end on each task
     for v in G:
         # get latest_end from end
         v.latest_end = None
@@ -183,12 +202,10 @@ def milp_schedule_graph(G, metadata):
                 v.latest_end = v.end_date
             else:
                 v.latest_end = busdays_between(today, v.end_date)
-        if not v.assignee_pool:
-            v.assignee_pool = list(all_people)
 
     ret, ms = milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_person, id_to_task)
     for r in ret:
         id_to_task[r.task].start_date = busdays_offset(today, r.start)
         id_to_task[r.task].end_date = busdays_offset(today, r.end)
-        id_to_task[r.task].assigned.append(r.person_name)
+        id_to_task[r.task].user_assigned.append(r.person_name)
     return ret, ms

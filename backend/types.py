@@ -23,9 +23,9 @@ class Task:
         self.buffer       = 0      # int; the number of business days difference between the task's scheduled dates and the estimate.
         self.floot        = 0      # int; how many business days later the task can end without causing the overall project to end late.
                                    # actually the term is "float" but, you know.
-        self.assigned     = []     # [str]; people and teams assigned to the task.
-        self.assignees    = []     # [str]; who ends up getting assigned to the task by the scheduler (if the task's been scheduled).
-        self.assignee_pool = []     # [str]; who is eligible for assignment
+        self.user_assigned     = []     # [str]; people and teams assigned to the task.
+        self.scheduler_assigned = []     # [str]; who ends up getting assigned to the task by the scheduler (if the task's been scheduled).
+        self.assignee_pool     = []     # [str]; who is eligible for assignment
         self.contended    = False  # bool; if True, the resources assigned to this task are also working on other tasks (if the task's been scheduled).
         self.desc         = None   # str; a description of the task.
         self.status       = None   # str; the task status. TODO should also be an enum.
