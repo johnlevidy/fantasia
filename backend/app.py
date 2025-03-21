@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template
+import traceback
 from traceback import format_exc
 from .notification import Notification, Severity
 from .json_parser import try_json
@@ -57,7 +58,9 @@ def process():
     except Exception as e:
         # For debugging convenience...
         print(f"Caught exception {e}")
-        print(format_exc(e))
+        print(traceback.format_exc())
+        # print(format_exc(e))
+
 
         # Let the client know.
         return jsonify({'message': str(e), 'notifications': [n.to_dict() for n in notifications] }), 500

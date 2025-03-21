@@ -4,6 +4,7 @@ import numpy as np
 import networkx as nx
 from networkx import NetworkXNoCycle
 
+from .milp_solve import milp_schedule_graph
 from .notification import Notification, Severity
 from .dateutil import busdays_between, busdays_offset, compare_busdays, parse_date
 from .types import Task, Edge, Metadata
@@ -240,38 +241,26 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
     parallelism_ratio = total_length / critical_path_length
     notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
-    # Schedule the tasks, if we have resource metadata.
-    if len(metadata.teams) == 0:
-        scheduler = no_op_scheduler
-    else:
-        scheduler = GreedyLevelingScheduler()
+    ret, makespan = milp_schedule_graph(G, metadata)
 
-    schedule_graph(G, scheduler, metadata)
+    # Print out the schedule and count how many days (and task-days) each person is working.
+    days_alloc  = defaultdict(int)
+    tasks_alloc = defaultdict(int)
 
-    if isinstance(scheduler, AssigningScheduler):
-        # Flag contended tasks.
-        calendar = scheduler.get_calendar()
-        for date, people in calendar.cal.items():
-            for person, tasks in people.items():
-                if len(tasks) > 1:
-                    for task in tasks:
-                        task.contended = True
+    for assignment in ret:
+        days_alloc[assignment.person_name] += (assignment.end - assignment.start)
+        tasks_alloc[assignment.person_name] += 1
 
-        # Print out the schedule and count how many days (and task-days) each person is working.
-        days_alloc  = defaultdict(int)
-        tasks_alloc = defaultdict(int)
-        for date in sorted(calendar.cal.keys()):
-            for person, tasks in calendar.cal[date].items():
-                    days_alloc[person]  += 1
-                    tasks_alloc[person] += len(tasks)
-                    print(f"{date} {person}: {tasks}")
-
-        # Print out the number of days allocated per person.
-        for person in sorted(days_alloc.keys()):
-            if tasks_alloc[person] > days_alloc[person]:
-                print(f"{person} - working {days_alloc[person]}d, overallocated by {tasks_alloc[person] - days_alloc[person]}d")
-            else:
-                print(f"{person} - working {days_alloc[person]}d")
+    # Print out the number of days allocated per person.
+    for person in sorted(days_alloc.keys()):
+        if tasks_alloc[person] > days_alloc[person]:
+            s = f"{person} - working {days_alloc[person]}d, overallocated by {tasks_alloc[person] - days_alloc[person]}d"
+            notifications.append(Notification(Severity.INFO, s))
+            print(s)
+        else:
+            s = f"{person} - working {days_alloc[person]}d"
+            notifications.append(Notification(Severity.INFO, s))
+            print(s)
 
     # Other dates and decorations.
     calculate_jit_dates(G)

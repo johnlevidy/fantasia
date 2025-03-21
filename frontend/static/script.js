@@ -60,7 +60,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     zoomEnabled: true,
                     fit: false,
                     center: true,
-                    zoomScaleSensitivity: .45
+                    zoomScaleSensitivity: .45,
+                    minZoom: .1,
+                    maxZoom: 10,
                 });
                 const containerWidth = document.getElementById('svgContainer').clientWidth;
                 const containerHeight = document.getElementById('svgContainer').clientHeight;
