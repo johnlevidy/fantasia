@@ -259,7 +259,9 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
     ret, makespan, valid_date = find_valid_schedule(G, metadata, today)
     end_date = busdays_offset(valid_date, makespan)
     if makespan != -1:
-        print(f"Valid schedule found with makespan: {makespan} on date: {valid_date} that ends on {end_date}")
+        s = f"Valid schedule found with makespan: {makespan} on date: {valid_date} that ends on {end_date}"
+        print(s)
+        notifications.append(Notification(Severity.INFO, s))
     else:
         notifications.append(Notification(Severity.FATAL, "No valid schedule found within the last 6 months. Exiting."))
         raise Exception("No valid schedule found within the last 6 months. Reconsider constraints.")

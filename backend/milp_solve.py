@@ -182,7 +182,7 @@ def milp_schedule_graph(G, metadata, today = datetime.now().date()):
             # Not supported right now, to support this we should add a notion of 
             # # of people on a project to target
             if assignee_pool and a not in metadata.teams.keys():
-                raise Exception(f"FATA: task {v.name} contains a mix of team assignments and user assignments. Not supported. {v.user_assigned}")
+                raise Exception(f"FATAL: task {v.name} contains a mix of team assignments and user assignments. Not supported. {v.user_assigned}")
         # If I'm assigning from a pool clear all user assignments since they're only 
         # team designations based on the above logic
         if assignee_pool:
