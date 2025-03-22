@@ -1,4 +1,6 @@
-from flask import Flask, request, jsonify, render_template
+from collections import defaultdict
+import uuid
+from flask import Flask, request, jsonify, render_template, session
 import traceback
 from traceback import format_exc
 from .notification import Notification, Severity
@@ -7,13 +9,24 @@ from .csv_parser import try_csv
 from .graph import compute_dag_metrics, compute_graph_metrics
 from .dot import generate_dot_file, generate_svg_graph
 from .schema import verify_schema
+import os
 
 # TODO: Get rid of any throws, swallow and append to error_string, then return 
 # those values and render in the table on the frontend
 app = Flask(__name__, static_folder='../frontend/static', template_folder='../frontend/templates')
 
+app.secret_key = os.environ.get("FLASK_SECRET_KEY")
+
+last_plan = defaultdict(list)
+
+def get_user_id():
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+    return session['user_id']
+
 @app.route('/')
 def home():
+    get_user_id()
     return render_template('index.html')
 
 # Returns a pair of the parsed content / python object and the notifications 
@@ -36,6 +49,11 @@ def parse_to_python(content):
 
     return None, None, json_notifications + csv_notifications + tsv_notifications
 
+@app.route('/get-copy-text', methods=['GET'])
+def get_copy_text():
+    response = { "text": '\n'.join(['\t'.join(l) for l in last_plan.get(get_user_id(), [])])}
+    return jsonify(response)
+
 @app.route('/process', methods=['POST'])
 def process():
     data = request.get_json()
@@ -47,7 +65,10 @@ def process():
     
     try:
         verify_schema(parsed_content, notifications)
-        G = compute_graph_metrics(parsed_content, metadata, notifications)
+        G, assignments = compute_graph_metrics(parsed_content, metadata, notifications)
+        if not get_user_id() in last_plan:
+            last_plan[get_user_id()] = []
+        last_plan[get_user_id()] = assignments
         svg = generate_svg_graph(G)
         response = {
             "image": svg,
