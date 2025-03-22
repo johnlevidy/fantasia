@@ -1,51 +1,245 @@
-html, body {
-    height: 100%;
-    margin: 0;
-    font-family: Arial, sans-serif;
-    display: flex;
-    align-items: center; /* Keeps vertical centering */
-    justify-content: center; /* Keeps horizontal centering */
-    flex-direction: column; /* Stacks children vertically */
+:root {
+    --primary-color: #1a73e8;
+    --primary-dark: #0d66d0;
+    --accent-color: #42854f4;
+    --background-color: #f8f9fa;
+    --surface-color: #ffffff;
+    --error-color: #ea4335;
+    --warning-color: #fbbc04;
+    --info-color: #4285f4;
+    --success-color: #34a853;
+    --text-primary: #202124;
+    --text-secondary: #5f6368;
+    --border-radius: 8px;
+    --shadow-sm: 0 1px 2px rgba(60 ,64, 67, .3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+    --shadow-md: 0 1px 6px rgba(60 ,64, 67, .3), 0 1px 8px 1px rgba(60, 64, 67, 0.15);
+    --transition: all 0.2s ease;
 }
 
-.centered-content {
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: 'Roboto', Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    padding: 16px;
+    overflow: hidden;
+}
+
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0 16px 0;
+    flex-shrink: 0;
+}
+
+.app-header h1 {
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.app-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    align-items: center;
+}
+
+.paste-area {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    border: 2px dashed #dadce0
+    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    font-size: 24px;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 16px;
+    height: 180px;
+    width: 90%;
+}
+
+.paste-area:hover {
+    border-color: var(--primary-color);
+}
+
+.paste-area svg {
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+}
+
+.paste-area p {
+    color: var(--text-secondary);
+    font-size: 16px;
+}
+
+.paste-area.hidden {
+    display: none;
+}
+
+.svg-viewer {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    flex: 1;
+    min-height: 0;
+    width: 95%;
+    position: relative;
+    display: none;
+    overflow: hidden;
 }
 
 .spinner {
-    border: 16px solid #f3f3f3; /* Light grey */
-    border-top: 16px solid #3498db; /* Blue */
-    border-radius: 50%;
-    width: 120px;
-    height: 120px;
-    animation: spin 2s linear infinite;
     position: absolute;
-    left: 50%;
     top: 50%;
-    margin: -60px 0 0 -60px; /* Offset by half the width and height */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s linear infinite;
+    z-index: 100;
+    display: none;
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-.notifications-container {
+.button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 24px;
+    padding: 8px 24px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+    display: none;
+}
+
+.button:hover {
+    background-color: var(--primary-dark);
+    box-shadow: var(--shadow-md);
+}
+
+.button:activate {
+    transform: scale(0.98);
+}
+
+.notifications {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    padding: 16px;
+    margin-top: 16px;
+    height: 300px;
+    width: 95%;
+    overflow-y: auto;
+    display: none;
+    flex-shrink: 0;
+}
+
+.notifications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.notifications-header h2 {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.notifications-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.notifications-table th {
     text-align: left;
-    width: 80%; /* Ensures it takes full width */
-    display: none; /* Initially hidden */
-    margin-top: 20px; /* Adds space between the notifications and the image */
-    margin-bottom: 80px; /* Adds space between the notifications and the image */
+    padding: 8px 16px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 1px solid #e0e0e0;
 }
 
-table th, table td {
-    padding: 6px; /* Adjust the padding value to increase or decrease space */
+.notifications-table td {
+    padding: 8px 16px;
+    border-bottom: 1px solid #e0e0e0;
 }
 
-#svgContainer {
-  width: 90vw; /* or 100vh, 80vh, whatever you like */
-  height: 75vw;
-  overflow: hidden;
-  margin-top: 40px;
+.notifications-table tr:last-child td {
+    border-bottom: none;
+}
+
+.severity-cell {
+    width: 100px;
+    font-weight: 500;
+}
+
+.severity-error {color: var(--error-color); }
+.severity-warning {color: var(--warning-color); }
+.severity-info {color: var(--info-color); }
+.severity-success {color: var(--success-color); }
+
+/* SVG Pan Zoom Controls */
+.svg-pan-zoom-control {
+    background-color: var(--surface-color);
+    border-radius: 50%;
+    box-shadow: var(--shadow-sm);
+    opacity: 0.8;
+    transition: var(--transition);
+}
+
+.svg-pan-zoom-control:hover {
+    opacity: 1;
+    box-shadow: var(--shadow-md);
+}
+
+.error-message {
+    color: var(--error-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+}
+
+.error-message svg {
+    margin-bottom: 12px;
 }
