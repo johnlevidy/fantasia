@@ -28,7 +28,7 @@ def csv_string_to_data(csv_string, notifications, delimiter):
     # Process each data row according to identified headers
     processed_data = []
     m = Metadata()
-    for row in data[1:]:
+    for row_idx, row in enumerate(data[1:]):
         # Skip empty rows.
         if len(row) == 0:
             continue
@@ -67,6 +67,7 @@ def csv_string_to_data(csv_string, notifications, delimiter):
         if not row_dict['Task'] or row_dict['Task'] == 'Task':
             continue
         processed_data.append(row_dict)
+        m.populated_rows.append(row_idx)
 
     return processed_data, m
 

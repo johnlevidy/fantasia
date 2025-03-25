@@ -51,8 +51,17 @@ def parse_to_python(content):
 
 @app.route('/get-copy-text', methods=['GET'])
 def get_copy_text():
-    response = { "text": '\n'.join(['\t'.join(l) for l in last_plan.get(get_user_id(), [])])}
+    response = { "text": '\n'.join(['\t'.join(l) if l else "\t\t\t" for l in last_plan.get(get_user_id(), [])])}
     return jsonify(response)
+
+# The user might have given us data with blank rows
+# in their sheet ( or uninterpretable ones as a task )
+# for aesthetic reasons or otherwise. This is to handle that case.
+def merge_data_with_rows(data, target_rows):
+    result = [None] * (max([a for a in target_rows]) + 1)
+    for index, row in enumerate(target_rows):
+        result[row] = data[index]
+    return result
 
 @app.route('/process', methods=['POST'])
 def process():
@@ -68,7 +77,7 @@ def process():
         G, assignments = compute_graph_metrics(parsed_content, metadata, notifications)
         if not get_user_id() in last_plan:
             last_plan[get_user_id()] = []
-        last_plan[get_user_id()] = assignments
+        last_plan[get_user_id()] = merge_data_with_rows(assignments, metadata.populated_rows)
         svg = generate_svg_graph(G)
         response = {
             "image": svg,

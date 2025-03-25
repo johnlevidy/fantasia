@@ -149,7 +149,7 @@ def milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_pers
         end = solver.Value(ends[task_id])
         assigned_person = solver.Value(person_assignments[task_id])
         ret.append(Assignment(original_task_id, id_to_task[original_task_id].name, assigned_person, start, end, person_id_to_person[assigned_person]))
-        processed_original_tasks.add(task_id)
+        processed_original_tasks.add(original_task_id)
     
     return ret, ms
     

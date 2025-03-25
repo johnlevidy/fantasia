@@ -67,6 +67,7 @@ class Metadata:
         self.teams      = defaultdict(list)
         self.people     = {}
         self.names      = set(self.ANON)
+        self.populated_rows = []
 
     def add_person(self, team, person):
         # Team and person can't be the same name.

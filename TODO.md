@@ -33,3 +33,7 @@ to a task as well as a vacation task we can flag that directly.
 [ ] Be able to refelct results back to the spreadsheet somehow
 [ ] Show "what can be picked up list" from a toposort ( y ask )
 [ ] make end ddate metadata work again
+[ ] IMPORTANT: figure out what happens as project evolve and dates roll
+[ ] deal with spaces in people's task lists, merge at end
+[ ] Parallelizable tasks ( linear chain of one day tasks for items with estimate != end - start )
+[ ] assign utilization % for people
