@@ -29,10 +29,14 @@ def register_task_start_end(model, id, horizon, intervals, starts, ends, task, e
 def get_effective_id(task_id, task_to_subtasks):
     return task_to_subtasks.get(task_id, [task_id])[0]
 
-def milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_person):
+def get_task_id(task_id, subtask_id_to_task_id):
+    return subtask_id_to_task_id[task_id] if task_id in subtask_id_to_task_id else task_id
+
+def milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_person, person_allocations):
+    print("-----------------Beginning an optimization---------------")
     nl = '\n'
     print(f"Task list: {nl.join([t.name for t in id_to_task.values()])}")
-    print(f"Person list: {nl.join([p for p in person_id_to_person.values()])}")
+    print(f"Person list: {nl.join(['-> '.join([p, str(a)]) for p, a in person_allocations.items()])}")
     model = cp_model.CpModel()
     horizon = sum(task.estimate for task in id_to_task.values())
     intervals = {}
@@ -55,12 +59,12 @@ def milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_pers
 
         # N >= 1 assignments already exist
         subtasks = []
-        for i, person in enumerate(task.user_assigned):
+        for i, person_id in enumerate(task.user_assigned):
             subtask_id = f"{task_id}_person_{i}"
             subtasks.append(subtask_id)
             subtask_id_to_task_id[subtask_id] = task_id
             register_task_start_end(model, subtask_id, horizon, intervals, starts, ends, task, expanded_tasks)
-            assign_people_to_task(model, person_assignments, subtask_id, [person_to_person_id[person]])
+            assign_people_to_task(model, person_assignments, subtask_id, [person_to_person_id[person_id]])
             # Force all subtasks to match the first start / end
             model.Add(starts[subtasks[0]] == starts[subtasks[i]])
             model.Add(ends[subtasks[0]] == ends[subtasks[i]])
@@ -85,31 +89,43 @@ def milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_pers
 
     # ---------------------------------------------------------------
     # Constrain people to non-overlapping tasks
-    for person in person_to_person_id.values():
+    person_weighted_durations = {}
+    for person, person_id in person_to_person_id.items():
         person_intervals = []
+        weighted_durations = []
         for task_id in intervals:  # Use all task IDs (original and subtasks)
-            is_assigned = model.NewBoolVar(f'assigned_{task_id}_to_{person}')
+            is_assigned = model.NewBoolVar(f'assigned_{task_id}_to_{person_id}')
             # Although it'd be less ergonomic to retrive results later, I strongly
             # suspect it's possible to get rid of these variables, and person_assignments 
             # entirely . There's no additional info being provided by having person 
             # assignments to task ids vs. knowing whether or not somebody is assigned 
             # to a task. I tried for 5m and gave up
-            model.Add(person_assignments[task_id] == person).OnlyEnforceIf(is_assigned)
-            model.Add(person_assignments[task_id] != person).OnlyEnforceIf(is_assigned.Not())
+            model.Add(person_assignments[task_id] == person_id).OnlyEnforceIf(is_assigned)
+            model.Add(person_assignments[task_id] != person_id).OnlyEnforceIf(is_assigned.Not())
             
             # These intervals may or may not exist, depending on whether or not 
             # the person is assigned. If they do, they cant overlap.
             optional_interval = model.NewOptionalIntervalVar(
                 starts[task_id], expanded_tasks[task_id].estimate, ends[task_id], 
-                is_assigned, f'opt_interval_{task_id}_{person}')
+                is_assigned, f'opt_interval_{task_id}_{person_id}')
             person_intervals.append(optional_interval)
+
+            t = id_to_task[get_task_id(task_id, subtask_id_to_task_id)]
+            weighted_duration = t.estimate * is_assigned
+            weighted_durations.append(weighted_duration)
         
         model.AddNoOverlap(person_intervals)
+        person_weighted_durations[person] = weighted_durations
     
     # Minimize the makespan
     makespan = model.NewIntVar(0, horizon, 'makespan')
     model.AddMaxEquality(makespan, [ends[task_id] for task_id in intervals])
     model.Minimize(makespan)
+
+    for person in person_id_to_person.values():
+        a = person_allocations[person]
+        if a != 1:
+            model.Add(sum(person_weighted_durations[person]) * 100 <= int(a * 100) * makespan)
     
     # Solve the model
     solver = cp_model.CpSolver()
@@ -194,7 +210,10 @@ def milp_schedule_graph(G, metadata, today = datetime.now().date()):
     for i, p in enumerate(all_people):
         person_id_to_person[i] = p
         person_to_person_id[p] = i
+
+    total_estimated_work = 0
     for i, r in enumerate(G):
+        total_estimated_work += r.estimate
         if r.end_date:
             offset = date_to_offset(r.end_date, today)
             # If the task was already indicated to end dtoday, exclude it from optimization
@@ -214,8 +233,7 @@ def milp_schedule_graph(G, metadata, today = datetime.now().date()):
         if v.end_date:
             v.latest_end = date_to_offset(v.end_date, today)
 
-    print("-----------------Beginning an optimization---------------")
-    ret, ms = milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_person)
+    ret, ms = milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_person, metadata.people_allocation)
     
     for r in ret:
         id_to_task[r.task].start_date = busdays_offset(today, r.start)

@@ -68,8 +68,9 @@ class Metadata:
         self.people     = {}
         self.names      = set(self.ANON)
         self.populated_rows = []
+        self.people_allocation = {}
 
-    def add_person(self, team, person):
+    def add_person(self, team, person, allocation):
         # Team and person can't be the same name.
         if team == person:
             raise Exception(f"Can't use {team} as a team name and person name")
@@ -78,6 +79,7 @@ class Metadata:
         if not team in self.teams:
             if team in self.names:
                 raise Exception(f"The team name \"{team}\" has already been used by another team or person")
+            self.people_allocation[person] = allocation
             self.names.add(team)
 
         # Add the person to the list and the reverse index, first making sure the name is unique.
@@ -85,4 +87,5 @@ class Metadata:
             raise Exception(f"The person name \"{person}\" has already been used by another team or person")
         self.teams[team].append(person)
         self.people[person] = team
+        self.people_allocation[person] = allocation
         self.names.add(person)
