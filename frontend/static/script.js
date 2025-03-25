@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     fit: true,
                     center: true,
                     zoomScaleSensitivity: .5,
-                    minZoom: .1,
+                    minZoom: .7,
                     maxZoom: 7,
                 });
 

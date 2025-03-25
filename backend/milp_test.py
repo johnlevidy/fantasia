@@ -250,11 +250,29 @@ class TestScheduler(unittest.TestCase):
             tasks=[
                 {"name": "Task1", "estimate": 2},
                 {"name": "Task2", "estimate": 3, "latest_end": 2},
-                {"name": "Task3", "estimate": 1}
+                {"name": "Task3", "estimate": 1, "latest_end": 3}
             ],
             dependencies=[],
             people=["Alice"],
-            expected_infeasible=True  # Cannot complete 2 (3 units) by time 3 if we start at 0
+            # We allow estimates and end dates before completion, 
+            # we just take it to mean an item that's either in progress
+            # or non-negotiable to happen now
+            expected_infeasible=False
+        )
+        self.run_scenario(scenario)
+
+    def test_latest_end_constraint(self):
+        scenario = TestScenario(
+            tasks=[
+                {"name": "Task1", "estimate": 2},
+                {"name": "Task2", "estimate": 3, "latest_end": 2},
+                {"name": "Task3", "estimate": 1, "latest_end": 2}
+            ],
+            dependencies=[],
+            people=["Alice"],
+            # Cannot complete task 2 ( 3 units) and task 3 ( 1 unit ) by 
+            # time 2, even with the adjustments
+            expected_infeasible=True
         )
         self.run_scenario(scenario)
 

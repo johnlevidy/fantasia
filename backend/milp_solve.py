@@ -4,7 +4,7 @@ from ortools.sat.python import cp_model
 import argparse
 
 from datetime import datetime
-from backend.dateutil import parse_date, busdays_between, busdays_offset
+from backend.dateutil import parse_date, busdays_between, busdays_offset, date_to_offset
 
 def assign_people_to_task(model, person_assignments, id, person_ids):
     if len(person_ids) == 1:
@@ -195,6 +195,15 @@ def milp_schedule_graph(G, metadata, today = datetime.now().date()):
         person_id_to_person[i] = p
         person_to_person_id[p] = i
     for i, r in enumerate(G):
+        if r.end_date:
+            offset = date_to_offset(r.end_date, today)
+            # If the task was already indicated to end dtoday, exclude it from optimization
+            if offset <= 0:
+                continue
+            # If the task estimate implies a start date before today, adjust estimate to fit
+            if r.estimate and r.estimate >= offset:
+                # CLEANUP: Eventually this should not mutate original value of estimate, probably.
+                r.estimate = offset
         id_to_task[i] = r
         task_to_id[r.name] = i
 
@@ -203,10 +212,7 @@ def milp_schedule_graph(G, metadata, today = datetime.now().date()):
         # get latest_end from end
         v.latest_end = None
         if v.end_date:
-            if isinstance(v.end_date, int):
-                v.latest_end = v.end_date
-            else:
-                v.latest_end = busdays_between(today, v.end_date)
+            v.latest_end = date_to_offset(v.end_date, today)
 
     print("-----------------Beginning an optimization---------------")
     ret, ms = milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_person)
