@@ -257,6 +257,9 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
 
     today = datetime.now().date()
     ret, makespan, valid_date = find_valid_schedule(G, metadata, today)
+    if today != valid_date:
+        notifications.append(Notification(Severity.ERROR, f"Schedule was discovered only by rolling back {today} to {valid_date}"))
+
     end_date = busdays_offset(valid_date, makespan)
     if makespan != -1:
         s = f"Valid schedule found with makespan: {makespan} on date: {valid_date} that ends on {end_date}"

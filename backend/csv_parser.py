@@ -4,6 +4,22 @@ from .types import Metadata
 from io import StringIO
 import csv
 
+def validate_and_convert_float(input_str):
+    value = float(input_str)
+    if 0 <= value <= 1:
+        return value
+    else:
+        raise ValueError(f"Bad allocation must be on [0, 1]: {input_str}")
+
+def parse_person(person):
+    allocation = person.strip().split(':')
+    if len(allocation) == 1:
+        return allocation[0], 1
+    elif len(allocation) == 2:
+        return allocation[0], validate_and_convert_float(allocation[1])
+    else:
+        raise Exception(f"Invalid allocation specification: {person}")
+
 def csv_string_to_data(csv_string, notifications, delimiter):
     csv_file_like = StringIO(csv_string)
     # Read the raw lines
@@ -43,7 +59,11 @@ def csv_string_to_data(csv_string, notifications, delimiter):
             case '%TEAM':
                 if len(row) < 3: raise Exception("Invalid %TEAM declaration; skipping")
                 team = row[1].strip()
-                [m.add_person(team, person.strip()) for person in row[2:] if person.strip()]
+                for person in row[2:]:
+                    if not person.strip():
+                        continue
+                    person, allocation = parse_person(person)
+                    m.add_person(team, person, allocation)
                 continue 
             case '%START':
                 if len(row) < 2: raise Exception("Invalid %START declaration; skipping")
@@ -75,5 +95,7 @@ def try_csv(data, notifications, delimiter):
     try:
         return csv_string_to_data(data, notifications, delimiter=delimiter)
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())
         notifications.append(Notification(Severity.ERROR, f"Invalid CSV (delimiter ASCII: {ord(delimiter)}) : {e}"))
         return None, None
