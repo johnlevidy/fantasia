@@ -12,3 +12,9 @@ def compare_busdays(start, end, estimate):
 
 def busdays_offset(date, days):
     return np.busday_offset(date, days, roll='forward').astype(datetime)
+
+def date_to_offset(maybe_date, today):
+    if isinstance(maybe_date, int):
+        return maybe_date
+    else:
+        return busdays_between(today, maybe_date)
