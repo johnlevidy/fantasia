@@ -1,4 +1,5 @@
 import dataclasses
+from .types import Assignment
 import itertools
 from ortools.sat.python import cp_model
 import argparse
@@ -132,15 +133,6 @@ def milp_solve(G, id_to_task, person_to_person_id, task_to_id, person_id_to_pers
     solver.parameters.max_time_in_seconds = 10
     status = solver.Solve(model)
 
-    @dataclasses.dataclass
-    class Assignment:
-        task: int
-        task_name: str
-        person: int
-        start: int
-        end: int
-        person_name: str
-
     ret = []
     if status in [cp_model.INFEASIBLE]:
         print("Overconstrained")
@@ -218,10 +210,12 @@ def milp_schedule_graph(G, metadata, today = datetime.now().date()):
             offset = date_to_offset(r.end_date, today)
             # If the task was already indicated to end dtoday, exclude it from optimization
             if offset <= 0:
+                print(f"Excluding {r.name}")
                 continue
             # If the task estimate implies a start date before today, adjust estimate to fit
             if r.estimate and r.estimate >= offset:
                 # CLEANUP: Eventually this should not mutate original value of estimate, probably.
+                print(f"{r.name} adjusted from {r.estimate} to {offset} {r.start_date} -> {r.end_date} today: {today}")
                 r.estimate = offset
         id_to_task[i] = r
         task_to_id[r.name] = i

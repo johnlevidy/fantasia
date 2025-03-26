@@ -1,5 +1,15 @@
 from collections import defaultdict
+import dataclasses
 from enum import StrEnum, auto
+
+@dataclasses.dataclass
+class Assignment:
+    task: int
+    task_name: str
+    person: int
+    start: int
+    end: int
+    person_name: str
 
 # Graph nodes are Tasks.
 # Identity is defined by name only, so the program can freely change other data on the task.
@@ -67,7 +77,7 @@ class Metadata:
         self.teams      = defaultdict(list)
         self.people     = {}
         self.names      = set(self.ANON)
-        self.populated_rows = []
+        self.task_to_input_row_idx = {}
         self.people_allocation = {}
 
     def add_person(self, team, person, allocation):

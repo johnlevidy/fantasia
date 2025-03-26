@@ -87,7 +87,7 @@ def csv_string_to_data(csv_string, notifications, delimiter):
         if not row_dict['Task'] or row_dict['Task'] == 'Task':
             continue
         processed_data.append(row_dict)
-        m.populated_rows.append(row_idx)
+        m.task_to_input_row_idx[row_dict['Task']] = row_idx
 
     return processed_data, m
 

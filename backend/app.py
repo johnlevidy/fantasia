@@ -57,10 +57,12 @@ def get_copy_text():
 # The user might have given us data with blank rows
 # in their sheet ( or uninterpretable ones as a task )
 # for aesthetic reasons or otherwise. This is to handle that case.
-def merge_data_with_rows(data, target_rows):
-    result = [None] * (max([a for a in target_rows]) + 1)
-    for index, row in enumerate(target_rows):
-        result[row] = data[index]
+def merge_data_with_rows(data, task_to_input_row_idx):
+    result = [None] * (max([a for a in task_to_input_row_idx.values()]) + 1)
+    for assignment in data:
+        print(assignment)
+        task_name = assignment[0]
+        result[task_to_input_row_idx[task_name]] = assignment[1:]
     return result
 
 @app.route('/process', methods=['POST'])
@@ -77,7 +79,7 @@ def process():
         G, assignments = compute_graph_metrics(parsed_content, metadata, notifications)
         if not get_user_id() in last_plan:
             last_plan[get_user_id()] = []
-        last_plan[get_user_id()] = merge_data_with_rows(assignments, metadata.populated_rows)
+        last_plan[get_user_id()] = merge_data_with_rows(assignments, metadata.task_to_input_row_idx)
         svg = generate_svg_graph(G)
         response = {
             "image": svg,

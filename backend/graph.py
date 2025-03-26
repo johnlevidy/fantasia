@@ -228,7 +228,6 @@ def find_valid_schedule(G, metadata, start_date):
     max_date = start_date - timedelta(weeks=24)
 
     while current_date >= max_date:
-        print("In here where im going back")
         ret, makespan = milp_schedule_graph(G, metadata, current_date)
         if makespan != -1:
             return ret, makespan, current_date
@@ -298,10 +297,21 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
     bad_start_end_dates = bad_start_end_dates or find_start_next_before_end(G, notifications)
 
     assignments = []
+
+    tmp = set()
+    # Have to add back whateveer got pruned / what I don't have an assignment for
+    # This is getting very messy and we desperately need to clean up these abstractions
+    for r in ret:
+        tmp.add(r.task_name)
+
+    for i, r in enumerate(G):
+        if r.name not in tmp:
+            assignments.append((r.name, r.start_date.strftime('%Y-%m-%d'), r.end_date.strftime('%Y-%m-%d'), ','.join([a for a in r.user_assigned])))
+
     for assignment in ret:
         start_date = busdays_offset(valid_date, assignment.start).strftime('%Y-%m-%d')
         end_date = busdays_offset(valid_date, assignment.end).strftime('%Y-%m-%d')
-        assignments.append((start_date, end_date, assignment.person_name))
+        assignments.append((assignment.task_name, start_date, end_date, assignment.person_name))
 
     # dont bother computing more metrics if there wasn't much intention behind the estimates
     if bad_start_end_dates:
