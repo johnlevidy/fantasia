@@ -4,6 +4,8 @@ Little web server which takes a json, csv, or clipboard copy from google sheet p
 
 Also computes a few helpful metrics like parallelism ratio and indicates items which have to be started imminently in order to meet completion deadlines ( based on existing estimates ). 
 
+More info can be found in the [detailed user guide](FANTASIA.md)
+
 
 To run the application:
 

@@ -37,3 +37,4 @@ to a task as well as a vacation task we can flag that directly.
 [ ] deal with spaces in people's task lists, merge at end
 [ ] Parallelizable tasks ( linear chain of one day tasks for items with estimate != end - start )
 [ ] assign utilization % for people
+[ ] Ability to "wipe out" someones assignment ( basically has to wipe all dates + assignments in their downstream dag )
