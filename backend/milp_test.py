@@ -1,4 +1,5 @@
 import unittest
+from collections import defaultdict
 import networkx as nx
 from typing import List, Dict, Optional, Set, Tuple
 from dataclasses import dataclass
@@ -18,7 +19,8 @@ def create_metadata_from_scenario(scenario):
     m = Metadata()
     m.teams['All'] = scenario.people
     m.people = scenario.people
-    m.teams = {}
+    m.people_allocation = {p: 1 for p in m.people}
+    m.teams = defaultdict(list)
     # Make special team names from the specs
     for spec in scenario.tasks:
         if 'assignee_pool' in spec:
