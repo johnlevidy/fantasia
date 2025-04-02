@@ -306,6 +306,8 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
 
     for i, r in enumerate(G):
         if r.name not in tmp:
+            assert not r.scheduler_assigned
+            r.scheduler_assigned.extend(r.user_assigned)
             assignments.append((r.name, r.start_date.strftime('%Y-%m-%d'), r.end_date.strftime('%Y-%m-%d'), ','.join([a for a in r.user_assigned])))
 
     for assignment in ret:
