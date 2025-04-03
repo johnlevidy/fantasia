@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date
 from typing import Dict, Optional, Tuple
 from .types import InputTask, parse_status
 from .metadata import row_contains_metadata
@@ -6,10 +6,14 @@ from .dateutil import parse_date
 from io import StringIO
 import csv
 
-def parse_dates_and_estimates(estimate: str, start_date: str, end_date: str) -> Tuple[Optional[int], Optional[datetime], Optional[datetime]]:
+def parse_dates_and_estimates(estimate: str, start_date: str, end_date: str) -> Tuple[Optional[int], Optional[date], Optional[date]]:
     start = parse_date(start_date) if start_date else None
     end = parse_date(end_date) if end_date else None
-    est = int(estimate) if estimate and estimate.isdigit() else None
+    est = None
+    if estimate:
+        if not estimate.isdigit():
+            raise Exception(f"Got estimate: {estimate} should look like a plain integer.")
+        est = int(estimate)
     return est, start, end
 
 def csv_string_to_task_list(csv_string: str, delimiter: str) -> list[InputTask]:

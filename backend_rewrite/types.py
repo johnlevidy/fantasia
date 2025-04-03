@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from typing import Optional
 from enum import Enum, StrEnum, auto
-from datetime import datetime
+from datetime import datetime, date
 
 # Edges only have dicts to store data; use a StrEnum to define the keys we use.
 class Edge(StrEnum):
@@ -11,7 +12,6 @@ class Edge(StrEnum):
 @dataclass
 class Person:
     name: str
-    allocation: float
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -47,32 +47,16 @@ class InputTask:
     # since it doesn't contain any allocation information
     assignees: list[str]
     next: list[str]
-    estimate: int
-    start_date: datetime
-    end_date: datetime
+    estimate: Optional[int]
+    start_date: Optional[date]
+    end_date: Optional[date]
     status: Status
     input_row_idx: int
 
     def __hash__(self):
         return hash(self.name)
 
-def validate_and_convert_float(input_str):
-    value = float(input_str)
-    if 0 <= value <= 1:
-        return value
-    else:
-        raise ValueError(f"Bad allocation must be on [0, 1]: {input_str}")
-
-def parse_person(person, allow_allocation = True):
-    pa = person.strip().split(':')
-    if len(pa) == 1:
-        return Person(pa[0], 1)
-    elif len(pa) == 2 and allow_allocation:
-        return Person(pa[0], validate_and_convert_float(pa[1]))
-    else:
-        raise Exception(f"Invalid allocation specification: {person}, allow_allocation: {allow_allocation}")
-       
-@dataclass 
+@dataclass
 class Team:
     name: str
     members: list[Person]
@@ -80,10 +64,18 @@ class Team:
 class Metadata:
     teams: list[Team] = []
     people: set[Person] = set()
+    people_allocations: dict[Person, float] = dict()
 
+    # Add the person, only add the allocation if new 
     def add_person(self, person: Person):
         if person not in self.people:
-            self.people.add(person)
+            self.people_allocations[person] = 1.0
+        self.people.add(person)
+    
+    # Add the person, then add the allocation, always override
+    def add_allocation(self, person: Person, allocation: float):
+        self.add_person(person)
+        self.people_allocations[person] = allocation
 
     def add_team(self, team: Team):
         for m in team.members:
