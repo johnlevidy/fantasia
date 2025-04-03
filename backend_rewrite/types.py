@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from enum import Enum, StrEnum, auto
-from datetime import datetime, date
+from datetime import date
 
 # Edges only have dicts to store data; use a StrEnum to define the keys we use.
 class Edge(StrEnum):
@@ -43,6 +43,7 @@ def parse_status(status: str) -> Status:
 @dataclass
 class InputTask:
     name: str
+    description: str
     # This _should_ be string ( not Person ) 
     # since it doesn't contain any allocation information
     assignees: list[str]
@@ -52,6 +53,19 @@ class InputTask:
     end_date: Optional[date]
     status: Status
     input_row_idx: int
+
+    # Added on at the end before rendering
+    critical: bool = False
+    buffer: int = 0
+    gen_start: bool = False
+    gen_end: bool = False
+    id: int = 0
+
+    def late(self, today: date):
+        if self.end_date:
+            return today > self.end_date
+        else:
+            return False
 
     def __hash__(self):
         return hash(self.name)

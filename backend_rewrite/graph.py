@@ -30,3 +30,11 @@ def build_graph(task_list: list[InputTask], metadata: Metadata):
             pass
 
     return G
+
+# Take in the InputTask graph and merge it with assignments
+# output by the scheduler
+def merge_with_assignments(G: nx.DiGraph) -> None:
+    id = 0
+    for v in G:
+        v.id = id
+        id += 1

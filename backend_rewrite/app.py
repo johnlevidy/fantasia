@@ -1,11 +1,15 @@
 from collections import defaultdict
 import uuid
+from .dot import generate_svg_graph
 from backend.app import parse_to_python
 from flask import Flask, request, jsonify, render_template, session
+from .notification import Notification
+
+from backend_rewrite.graph_metrics import output_graph_metrics
 from .parse_csv import csv_string_to_task_list 
 from .metadata import extract_metadata
-from .verify import verify
-from .graph import build_graph
+from .verify import verify_inputs, verify_graph
+from .graph import build_graph, merge_with_assignments
 import os
 
 app = Flask(__name__, static_folder='../frontend/static', template_folder='../frontend/templates')
@@ -43,27 +47,36 @@ def merge_data_with_rows(data, task_to_input_row_idx):
 def process():
     try:
         content = request.get_json()['content']
+        notifications: list[Notification] = []
+
         # Make the python data structure and extract metadata
+        # then verify the inputs are consistent
         metadata = extract_metadata(content, '\t')
         tasks = csv_string_to_task_list(content, '\t')
+        verify_inputs(metadata, tasks)
 
-        # Some final basic data sanity checks
-        verify(metadata, tasks)
-
-        # Build the upper graph
+        # Build the upper graph and verify it
         G = build_graph(tasks, metadata)
-        import networkx as nx
-        critical_path = nx.dag_longest_path(G)
-        crit_length = 0
-        for task in critical_path:
-            crit_length += task.estimate
-        print(f"Critical path is {critical_path}")
-        print(f"Length is: {crit_length}")
-        print(metadata.teams)
-        print(metadata.people)
+        verify_graph(G)
 
-        return jsonify({'message': str(tasks)}), 500
+        # Append notifications with some helpful metrics
+        output_graph_metrics(G, notifications)
+
+        # Do the scheduling, get the assignments
+        # TODO
+
+        # Take scheudler outputs and do final graph 
+        # decoration before generating graph visualization
+        merge_with_assignments(G)
+
+        response = {
+            "image": generate_svg_graph(G),
+            "notifications": [n.to_dict() for n in notifications], 
+        }
+        return jsonify(response)
+
     except Exception as e:
+        print(f"Caught exception {e}")
         return jsonify({'message': str(e)}), 500
 
 if __name__ == '__main__':

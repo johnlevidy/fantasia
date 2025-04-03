@@ -26,7 +26,7 @@ def csv_string_to_task_list(csv_string: str, delimiter: str) -> list[InputTask]:
     headers = data[0]
 
     # TODO: get all expected
-    expected_columns = ['Task', 'Estimate', 'StartDate', 'EndDate', 'Status', 'Assignee', 'next']
+    expected_columns = ['Task', 'Description', 'Estimate', 'StartDate', 'EndDate', 'Status', 'Assignee', 'next']
     for e in expected_columns:
         if e not in headers:
             raise Exception(f"No header '{e}' in headers: {headers}")
@@ -53,7 +53,7 @@ def csv_string_to_task_list(csv_string: str, delimiter: str) -> list[InputTask]:
         assignees = [a.strip() for a in row_dict['Assignee'].split(',') if a.strip()]
         est, start, end = parse_dates_and_estimates(row_dict['Estimate'], row_dict['StartDate'], row_dict['EndDate'])
         status = parse_status(row_dict['Status'])
-        t = InputTask(row_dict['Task'], assignees, next, est, start, end, status, row_idx)
+        t = InputTask(row_dict['Task'], row_dict['Description'], assignees, next, est, start, end, status, row_idx)
 
         # Add to the output
         processed_data.append(t)

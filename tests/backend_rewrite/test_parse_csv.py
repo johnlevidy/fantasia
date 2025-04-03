@@ -19,10 +19,10 @@ class TestParseCSV(unittest.TestCase):
         medium_date = datetime.date(2025, 4, 8)
         end_date = datetime.date(2025, 4, 11)
 
-        self.assertEqual(res[0], InputTask("TaskA", ['Michael'], ['TaskC'], 5, start_date, medium_date, Status.NotStarted, 1))
-        self.assertEqual(res[1], InputTask("TaskB", ['Michael'], ['TaskC'], 6, start_date, medium_date, Status.InProgress, 2))
-        self.assertEqual(res[2], InputTask("TaskC", ['Michael'], ['TaskD'], 7, start_date, medium_date, Status.Completed, 4))
-        self.assertEqual(res[3], InputTask("TaskD", ['John'], [], 0, medium_date, end_date, Status.Milestone, 5))
+        self.assertEqual(res[0], InputTask("TaskA", "desc", ['Michael'], ['TaskC'], 5, start_date, medium_date, Status.NotStarted, 1))
+        self.assertEqual(res[1], InputTask("TaskB", "desc", ['Michael'], ['TaskC'], 6, start_date, medium_date, Status.InProgress, 2))
+        self.assertEqual(res[2], InputTask("TaskC", "desc", ['Michael'], ['TaskD'], 7, start_date, medium_date, Status.Completed, 4))
+        self.assertEqual(res[3], InputTask("TaskD", "desc", ['John'], [], 0, medium_date, end_date, Status.Milestone, 5))
 
     def test_no_headers(self):
         input = '''Task|Estimate|StartDate|EndDate|Status|Assignee|next'''
