@@ -1,4 +1,5 @@
 from collections import defaultdict
+import traceback
 import uuid
 from .dot import generate_svg_graph
 from backend.app import parse_to_python
@@ -9,7 +10,9 @@ from backend_rewrite.graph_metrics import output_graph_metrics
 from .parse_csv import csv_string_to_task_list 
 from .metadata import extract_metadata
 from .verify import verify_inputs, verify_graph
-from .graph import build_graph, merge_with_assignments
+from .scheduler import find_solution
+from .graph import build_graph, merge_graphs
+from .expand import expand_specific_tasks, expand_parallelizable_tasks
 import os
 
 app = Flask(__name__, static_folder='../frontend/static', template_folder='../frontend/templates')
@@ -52,22 +55,30 @@ def process():
         # Make the python data structure and extract metadata
         # then verify the inputs are consistent
         metadata = extract_metadata(content, '\t')
-        tasks = csv_string_to_task_list(content, '\t')
+        tasks = csv_string_to_task_list(content, '\t', metadata)
         verify_inputs(metadata, tasks)
 
         # Build the upper graph and verify it
         G = build_graph(tasks, metadata)
         verify_graph(G)
-
         # Append notifications with some helpful metrics
         output_graph_metrics(G, notifications)
 
-        # Do the scheduling, get the assignments
-        # TODO
+        # Expand the tasks into subtasks where appropriate
+        tasks, specific_subtasks = expand_specific_tasks(tasks)
+        tasks, parallelizable_subtasks = expand_parallelizable_tasks(tasks)
+        
+        # Build the lower graph and verify it
+        L = build_graph(tasks, metadata)
+        verify_graph(L)
 
-        # Take scheudler outputs and do final graph 
-        # decoration before generating graph visualization
-        merge_with_assignments(G)
+        # Do the scheduling, note that this statefully updates L
+        find_solution(L, metadata)
+
+        # Merge L back onto G
+        merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
+
+        # Decorate G before rendering
 
         response = {
             "image": generate_svg_graph(G),
@@ -77,6 +88,7 @@ def process():
 
     except Exception as e:
         print(f"Caught exception {e}")
+        print(traceback.format_exc())
         return jsonify({'message': str(e)}), 500
 
 if __name__ == '__main__':

@@ -6,6 +6,8 @@ from .types import Metadata, Team, Person
 
 # Used elsewhere
 def row_contains_metadata(row: list[str]) -> bool:
+    if not row:
+        return False
     return row[0].strip().startswith('%')
 
 def validate_and_convert_float(input_str):
@@ -38,8 +40,6 @@ def parse_team(row: list[str]) -> Team:
 def extract_metadata(input: str, delimiter: str) -> Metadata:
     csv_file_like = StringIO(input)
     data = list(csv.reader(csv_file_like, delimiter=delimiter))
-
-    print(data)
     m = Metadata()
     for row in data:
         row = [r.strip() for r in row]

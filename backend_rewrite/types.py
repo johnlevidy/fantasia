@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from enum import Enum, StrEnum, auto
 from datetime import date
@@ -40,19 +40,43 @@ StatusNormalization: dict[str, Status] = {
 def parse_status(status: str) -> Status:
     return StatusNormalization[status] if status in StatusNormalization else Status[status]
 
+# Scheduler tasks are more granular
+# and contain only the absolutely essential information
+# for the solver
+@dataclass
+class SchedulerFields:
+    id: int
+    eligible_assignees: list[int]
+    assignees: list[int]
+    start_time: int
+    end_time: int
+    estimate: int
+
+@dataclass
+class SchedulerAssignment:
+    id: int # task_id
+    start_date: int
+    end_date: int
+    assignee: int
+
 @dataclass
 class InputTask:
     name: str
     description: str
     # This _should_ be string ( not Person ) 
     # since it doesn't contain any allocation information
+    specific_assignments: bool
     assignees: list[str]
     next: list[str]
-    estimate: Optional[int]
+    parallelizable: bool
+    estimate: int
     start_date: Optional[date]
     end_date: Optional[date]
     status: Status
     input_row_idx: int
+
+    # Added and edited by scheduler
+    scheduler_fields: SchedulerFields = field(default_factory=lambda: SchedulerFields(0, [], [], 0, 0, 0))
 
     # Added on at the end before rendering
     critical: bool = False
@@ -76,7 +100,7 @@ class Team:
     members: list[Person]
 
 class Metadata:
-    teams: list[Team] = []
+    teams: dict[str, Team] = dict()
     people: set[Person] = set()
     people_allocations: dict[Person, float] = dict()
 
@@ -94,4 +118,6 @@ class Metadata:
     def add_team(self, team: Team):
         for m in team.members:
             self.add_person(m)
-        self.teams.append(Team(team.name, team.members))
+        self.teams[team.name] = team
+
+

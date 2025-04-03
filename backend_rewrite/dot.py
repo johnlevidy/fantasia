@@ -19,6 +19,18 @@ def style_text(text, **kwargs):
     if bold:   s = f"<b>{s}</b>"
     
     return s
+# Deprecated
+# gen_start -- because it's always either provided or generated now, there's no 
+# thing where it assigns an initial one then massages it. easy enough for user
+# to deduce on their own i think?
+# floot -- i'm not sure we can compute this anymore, knowing how many days late
+# an item can be before the project is late requires accounting for that persons
+# entire subgraph going forward ( and its relation to everyone elses ) -- I think 
+# it just degenerates into another full optimization?
+# gen_estimate -- doesnt' maek sense anymore
+# active -- can we just derive this?
+# late -- same as active
+# contended -- cant happen anymore
 
 def dot_task(task):
     wrap_desc      = '<br/>'.join(textwrap.wrap(html.escape(task.description), width=70))

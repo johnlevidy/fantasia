@@ -18,18 +18,6 @@ def output_graph_metrics(G: nx.DiGraph, notifications: list[Notification]) -> No
     notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
 SOON_THRESHOLD = 3
-# Deprecated
-# gen_start -- because it's always either provided or generated now, there's no 
-# thing where it assigns an initial one then massages it. easy enough for user
-# to deduce on their own i think?
-# floot -- i'm not sure we can compute this anymore, knowing how many days late
-# an item can be before the project is late requires accounting for that persons
-# entire subgraph going forward ( and its relation to everyone elses ) -- I think 
-# it just degenerates into another full optimization?
-# gen_estimate -- doesnt' maek sense anymore
-# active -- can we just derive this?
-# late -- same as active
-# contended -- cant happen anymore
 
 # Things I agree should be annotated on this graph
 
