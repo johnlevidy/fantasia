@@ -18,12 +18,12 @@ class Person:
     def __hash__(self) -> int:
         return hash(self.name)
 
-class Status(Enum):
-    InProgress = 1
-    Blocked = 2
-    Milestone = 3
-    Completed = 4
-    NotStarted = 5
+class Status(StrEnum):
+    InProgress = 'in progress'
+    Blocked = 'blocked' 
+    Milestone = 'milestone'
+    Completed = 'completed'
+    NotStarted = 'not started'
 
 StatusNormalization: dict[str, Status] = {
     'in progress' : (Status.InProgress),
@@ -53,6 +53,7 @@ class SchedulerFields:
     start_time: int
     end_time: int
     estimate: int
+    exclude: bool
 
 @dataclass
 class SchedulerAssignment:
@@ -82,7 +83,7 @@ class InputTask:
     input_row_idx: int
 
     # Added and edited by scheduler
-    scheduler_fields: SchedulerFields = field(default_factory=lambda: SchedulerFields(0, [], [], 0, 0, 0))
+    scheduler_fields: SchedulerFields = field(default_factory=lambda: SchedulerFields(0, [], [], 0, 0, 0, True))
 
     def __hash__(self):
         return hash(self.name)

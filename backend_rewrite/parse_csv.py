@@ -2,17 +2,21 @@ from datetime import date
 from typing import Dict, Optional, Tuple
 from .types import InputTask, parse_status, Metadata
 from .metadata import row_contains_metadata
-from .dateutil import parse_date
+from .dateutil import parse_date, busdays_between
 from io import StringIO
 import csv
 
 # returns parallelizable, estimate, start, end, 
-def parse_dates_and_estimates(estimate: str, start_date: str, end_date: str) -> Tuple[bool, int, Optional[date], Optional[date]]:
+def parse_dates_and_estimates(task_name: str, estimate: str, start_date: str, end_date: str) -> Tuple[bool, int, Optional[date], Optional[date]]:
     start = parse_date(start_date) if start_date else None
     end = parse_date(end_date) if end_date else None
     parallelizable = False
     if not estimate:
-        raise Exception(f"Got bad estimate: {estimate}")
+        if start and end:
+            # Infer the estimate based on start / end
+            return parallelizable, busdays_between(start, end), start, end
+        else:
+            raise Exception(f"Got bad estimate for row {task_name} with no start / end: {estimate}")
 
     if estimate[0] == '~':
         estimate = estimate[1:]
@@ -69,7 +73,7 @@ def csv_string_to_task_list(csv_string: str, delimiter: str, metadata: Metadata)
         # Special cases / non string types
         next = [v.strip() for v in row[next_index:] if v.strip()]
         assignees = [a.strip() for a in row_dict['Assignee'].split(',') if a.strip()]
-        parallelizable, est, start, end = parse_dates_and_estimates(row_dict['Estimate'], row_dict['StartDate'], row_dict['EndDate'])
+        parallelizable, est, start, end = parse_dates_and_estimates(row_dict['Task'], row_dict['Estimate'], row_dict['StartDate'], row_dict['EndDate'])
         status = parse_status(row_dict['Status'])
         t = InputTask(row_dict['Task'], row_dict['Description'], verify_assignees(assignees, metadata), assignees, next, parallelizable, est, start, end, status, row_idx)
 

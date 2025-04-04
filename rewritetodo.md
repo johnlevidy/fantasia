@@ -1,7 +1,9 @@
-- [ ] Fix up the teams to not have both the dict and set
-- [ ] clean up extra fields on inputtask
-- [ ] handle start / end dates on expanding parallelizable tasks
+- [x] Fix up the teams to not have both the dict and set
+- [x] clean up extra fields on inputtask
+- [x] handle start / end dates on expanding parallelizable tasks
 - [ ] Use metadata / m consistently throughout
+- [ ] copying plans out 
 
 # Separate bucket of notifications
-- [ ] "needs to start soon but not in progress"
+- [x] "needs to start soon but not in progress"
+- [x] "makespan found" thing

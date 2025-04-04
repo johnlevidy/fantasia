@@ -23,11 +23,6 @@ def build_graph(task_list: list[InputTask], metadata: Metadata):
     for task in tasks.values():
         G.add_node(task)
 
-    for task in tasks.values():
-        for next in task.next:
-            if next not in tasks:
-                raise Exception(f"Task {task.name} declares next {next} which is not itself a task.")
-
     for u, v in edges:
         if u in tasks and v in tasks:
             G.add_edge(tasks[u], tasks[v], **{

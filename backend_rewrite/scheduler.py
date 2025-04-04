@@ -12,8 +12,8 @@ from ortools.sat.python import cp_model
 from networkx import DiGraph
 
 # Register eligible or fixed assignments for a task
-def assign_people_to_task(model: cp_model.CpModel, person_assignments: Dict[int, cp_model.IntVar], task: InputTask, person_ids):
-    id: int = task.scheduler_fields.id
+def assign_people_to_task(model: cp_model.CpModel, person_assignments: Dict[int, cp_model.IntVar], scheduler_fields: SchedulerFields, person_ids):
+    id: int = scheduler_fields.id
     if len(person_ids) == 1:
         person_assignments[id] = model.NewConstant(person_ids[0])
     elif len(person_ids) > 1:
@@ -21,9 +21,9 @@ def assign_people_to_task(model: cp_model.CpModel, person_assignments: Dict[int,
             cp_model.Domain.FromValues(person_ids), f'person_{id}')
          
 # Register the start end end and interval of a task
-def register_task_start_end(model: cp_model.CpModel, task: InputTask, horizon: int, 
+def register_task_start_end(model: cp_model.CpModel, scheduler_fields: SchedulerFields, horizon: int,
                             task_starts: Dict[int, cp_model.IntVar], task_ends: Dict[int, cp_model.IntVar]):
-    id = task.scheduler_fields.id
+    id = scheduler_fields.id
     # Create a new start variable for this subtask
     start_var = model.NewIntVar(0, horizon, f'start_{id}')
     end_var = model.NewIntVar(0, horizon, f'end_{id}')
@@ -31,9 +31,26 @@ def register_task_start_end(model: cp_model.CpModel, task: InputTask, horizon: i
     task_starts[id] = start_var
     task_ends[id] = end_var
 
+class ValidTasks:
+    def __init__(self, tasks):
+        self.tasks = tasks
+        self._iterator = None
+
+    def __iter__(self):
+        self._iterator = iter(self.tasks) # Create an iterator over the tasks
+        return self
+
+    def __next__(self) -> InputTask:
+        # Loop through the internal iterator
+        assert self._iterator
+        for task in self._iterator:
+            if not task.scheduler_fields.exclude:
+                return task
+        raise StopIteration
+
 # Find a valid schedule, return assignments
 def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person, int],
-             horizon: int, ts_specific: Dict[InputTask, list[InputTask]]) \
+             horizon: int, ts_specific: Dict[InputTask, list[InputTask]], notifications: list[Notification])\
              -> Tuple[Dict[InputTask, SchedulerAssignment], int]:
     model: cp_model.CpModel = cp_model.CpModel()
 
@@ -45,22 +62,22 @@ def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person,
     # -------------------------------------------------------------
     # Build constraints around who may be assigned to certain tasks
     task: InputTask
-    for task in G:
+    for task in ValidTasks(G):
         if not task.scheduler_fields.assignees:
-            register_task_start_end(model, task, horizon,
+            register_task_start_end(model, task.scheduler_fields, horizon,
                                     task_starts, task_ends)
-            assign_people_to_task(model, person_assignments, task, task.scheduler_fields.eligible_assignees)
+            assign_people_to_task(model, person_assignments, task.scheduler_fields, task.scheduler_fields.eligible_assignees)
             continue
         if not task.specific_assignments:
             raise Exception(f"Something unexpected happened in scheduling task: {task}")
-        register_task_start_end(model, task, horizon,
+        register_task_start_end(model, task.scheduler_fields, horizon,
                                 task_starts, task_ends)
-        assign_people_to_task(model, person_assignments, task, task.scheduler_fields.assignees)
+        assign_people_to_task(model, person_assignments, task.scheduler_fields, task.scheduler_fields.assignees)
 
     # -------------------------------------------------------------
     # Build constraints around ensuring subtasks of multi-assignments
     # are worked on simultaneously
-    for task in G:
+    for task in ValidTasks(G):
         for s in ts_specific.get(task, []):
             model.Add(task_starts[task.scheduler_fields.id] ==
                       task_starts[s.scheduler_fields.id])
@@ -74,13 +91,13 @@ def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person,
     # ---------------------------------------------------------------
     # Tasks must end before their "latest end" assigned date
     task: InputTask
-    for task in G:
+    for task in ValidTasks(G):
         model.Add(task_ends[task.scheduler_fields.id] <= task.scheduler_fields.end_time)
 
     # ---------------------------------------------------------------
     # Constrain that successor items start after the end of the deps
     task: InputTask
-    for task in G:
+    for task in ValidTasks(G):
         for successor in G.successors(task):
             model.Add(task_starts[successor.scheduler_fields.id] >= task_ends[task.scheduler_fields.id])
 
@@ -91,7 +108,7 @@ def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person,
         person_intervals = []
         weighted_durations = []
         task: InputTask
-        for task in G:
+        for task in ValidTasks(G):
             is_assigned = model.NewBoolVar(f'assigned_{task.scheduler_fields.id}_to_{person_id}')
             # Although it'd be less ergonomic to retrive results later, I strongly
             # suspect it's possible to get rid of these variables, and person_assignments 
@@ -139,10 +156,12 @@ def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person,
         print("No solution found.")
         return dict(), -1
     status_str = "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE"
-    print(f'Minimal makespan {status_str}: {solver.Value(makespan)} days\n')
+    s = f'Minimal makespan {status_str}: {solver.Value(makespan)} days\n'
+    print(s)
+    notifications.append(Notification(Severity.INFO, s))
 
     ret: Dict[InputTask, SchedulerAssignment] = dict()
-    for task in G:
+    for task in ValidTasks(G):
         id = task.scheduler_fields.id
         start = solver.Value(task_starts[id])
         end = solver.Value(task_ends[id])
@@ -198,16 +217,19 @@ def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[Inp
         for task in G:
             specific, pool = get_assignees(task, m, person_to_person_id)
             s, e = densify_dates(today, task.start_date, task.end_date, horizon)
-            task.scheduler_fields = SchedulerFields(id, pool, specific, s, e, task.estimate)
+            exclude = e < 0
+            # If it started already, estimate is however long ( remains ) to end
+            scheduling_estimate = task.estimate if s >= 0 else e
+            task.scheduler_fields = SchedulerFields(id, pool, specific, s, e, scheduling_estimate, exclude)
             task_to_task_id[task] = id
             id += 1
 
         # At this point all scheduler fields are ready, we can attempt a solution no
-        assignments, makespan = schedule(G, m, person_to_person_id, horizon, ts_specific)
+        assignments, makespan = schedule(G, m, person_to_person_id, horizon, ts_specific, notifications)
         if assignments:
             # Apply the solution to the original graph
             # if we found one
-            for task in G:
+            for task in ValidTasks(G):
                 assignment: SchedulerAssignment = assignments[task]
                 task.start_date = busdays_offset(today, assignment.start_date)
                 task.end_date = busdays_offset(today, assignment.end_date)
