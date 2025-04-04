@@ -1,5 +1,15 @@
 from collections import defaultdict
+import dataclasses
 from enum import StrEnum, auto
+
+@dataclasses.dataclass
+class Assignment:
+    task: int
+    task_name: str
+    person: int
+    start: int
+    end: int
+    person_name: str
 
 # Graph nodes are Tasks.
 # Identity is defined by name only, so the program can freely change other data on the task.
@@ -23,8 +33,9 @@ class Task:
         self.buffer       = 0      # int; the number of business days difference between the task's scheduled dates and the estimate.
         self.floot        = 0      # int; how many business days later the task can end without causing the overall project to end late.
                                    # actually the term is "float" but, you know.
-        self.assigned     = []     # [str]; people and teams assigned to the task.
-        self.assignees    = []     # [str]; who ends up getting assigned to the task by the scheduler (if the task's been scheduled).
+        self.user_assigned     = []     # [str]; people and teams assigned to the task.
+        self.scheduler_assigned = []     # [str]; who ends up getting assigned to the task by the scheduler (if the task's been scheduled).
+        self.assignee_pool     = []     # [str]; who is eligible for assignment
         self.contended    = False  # bool; if True, the resources assigned to this task are also working on other tasks (if the task's been scheduled).
         self.desc         = None   # str; a description of the task.
         self.status       = None   # str; the task status. TODO should also be an enum.
@@ -35,6 +46,7 @@ class Task:
         self.soon         = False  # bool; if True, this task starts in the next few days.
         self.up_next      = False  # bool; if True, this task immediately follows one in progress.
         self.critical     = False  # bool; if True, this task (and edge) is on the critical path for the project.
+        self.latest_end   = 0      # End in busdays
 
     def __eq__(self, other):
         if not isinstance(other, Task):
@@ -65,8 +77,10 @@ class Metadata:
         self.teams      = defaultdict(list)
         self.people     = {}
         self.names      = set(self.ANON)
+        self.task_to_input_row_idx = {}
+        self.people_allocation = {}
 
-    def add_person(self, team, person):
+    def add_person(self, team, person, allocation):
         # Team and person can't be the same name.
         if team == person:
             raise Exception(f"Can't use {team} as a team name and person name")
@@ -75,6 +89,7 @@ class Metadata:
         if not team in self.teams:
             if team in self.names:
                 raise Exception(f"The team name \"{team}\" has already been used by another team or person")
+            self.people_allocation[person] = allocation
             self.names.add(team)
 
         # Add the person to the list and the reverse index, first making sure the name is unique.
@@ -82,4 +97,5 @@ class Metadata:
             raise Exception(f"The person name \"{person}\" has already been used by another team or person")
         self.teams[team].append(person)
         self.people[person] = team
+        self.people_allocation[person] = allocation
         self.names.add(person)

@@ -1,9 +1,10 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import networkx as nx
 from networkx import NetworkXNoCycle
 
+from .milp_solve import milp_schedule_graph
 from .notification import Notification, Severity
 from .dateutil import busdays_between, busdays_offset, compare_busdays, parse_date
 from .types import Task, Edge, Metadata
@@ -83,7 +84,7 @@ def build_graph(task_rows, metadata):
 
         # Assignees.
         if 'Assignee' in task_row:
-            task.assigned = [a.strip() for a in get_field('Assignee', '').split(',') if len(a.strip()) > 0]
+            task.user_assigned = [a.strip() for a in get_field('Assignee', '').split(',') if len(a.strip()) > 0]
 
         # Store edges.
         for next_task in task_row['next']:
@@ -222,6 +223,19 @@ def check_start_dates(G: nx.Graph, notifications: list[Notification], buffer_day
         if start_date <= alert_date and (status != 'in progress' and status != 'done'):
             notifications.append(Notification(Severity.INFO, f"Task {task} starts on {start_date}, which is within {buffer_days} business days from today ({today_date}). Status: {status}. Check readiness."))
 
+def find_valid_schedule(G, metadata, start_date):
+    current_date = start_date
+    max_date = start_date - timedelta(weeks=24)
+
+    while current_date >= max_date:
+        ret, makespan = milp_schedule_graph(G, metadata, current_date)
+        if makespan != -1:
+            return ret, makespan, current_date
+        # subtract 1 week and try again
+        current_date -= timedelta(weeks=1)
+    # If no valid schedule is found within max range, just return nothing
+    return None, -1, None
+
 def compute_graph_metrics(parsed_content, metadata, notifications):
     # The metadata may specify a start date, but if it doesn't, set it to today.
     if metadata.start_date is None:
@@ -240,38 +254,39 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
     parallelism_ratio = total_length / critical_path_length
     notifications.append(Notification(Severity.INFO, f"[Total Length: {total_length}], [Critical Path Length: {critical_path_length}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
-    # Schedule the tasks, if we have resource metadata.
-    if len(metadata.teams) == 0:
-        scheduler = no_op_scheduler
+    today = datetime.now().date()
+    ret, makespan, valid_date = find_valid_schedule(G, metadata, today)
+    if today != valid_date:
+        notifications.append(Notification(Severity.ERROR, f"Schedule was discovered only by rolling back {today} to {valid_date}"))
+
+    end_date = busdays_offset(valid_date, makespan)
+    if makespan != -1:
+        s = f"Valid schedule found with makespan: {makespan} on date: {valid_date} that ends on {end_date}"
+        print(s)
+        notifications.append(Notification(Severity.INFO, s))
     else:
-        scheduler = GreedyLevelingScheduler()
+        notifications.append(Notification(Severity.FATAL, "No valid schedule found within the last 6 months. Exiting."))
+        raise Exception("No valid schedule found within the last 6 months. Reconsider constraints.")
 
-    schedule_graph(G, scheduler, metadata)
+    # Print out the schedule and count how many days (and task-days) each person is working.
+    days_alloc  = defaultdict(int)
+    tasks_alloc = defaultdict(int)
 
-    if isinstance(scheduler, AssigningScheduler):
-        # Flag contended tasks.
-        calendar = scheduler.get_calendar()
-        for date, people in calendar.cal.items():
-            for person, tasks in people.items():
-                if len(tasks) > 1:
-                    for task in tasks:
-                        task.contended = True
+    for assignment in ret:
+        days_alloc[assignment.person_name] += (assignment.end - assignment.start)
+        tasks_alloc[assignment.person_name] += 1
 
-        # Print out the schedule and count how many days (and task-days) each person is working.
-        days_alloc  = defaultdict(int)
-        tasks_alloc = defaultdict(int)
-        for date in sorted(calendar.cal.keys()):
-            for person, tasks in calendar.cal[date].items():
-                    days_alloc[person]  += 1
-                    tasks_alloc[person] += len(tasks)
-                    print(f"{date} {person}: {tasks}")
-
-        # Print out the number of days allocated per person.
-        for person in sorted(days_alloc.keys()):
-            if tasks_alloc[person] > days_alloc[person]:
-                print(f"{person} - working {days_alloc[person]}d, overallocated by {tasks_alloc[person] - days_alloc[person]}d")
-            else:
-                print(f"{person} - working {days_alloc[person]}d")
+    # Print out the number of days allocated per person.
+    for person in sorted(days_alloc.keys()):
+        percentage_days_worked = (days_alloc[person] / makespan) * 100
+        if tasks_alloc[person] > days_alloc[person]:
+            s = f"{person} - working {days_alloc[person]}d, overallocated by {tasks_alloc[person] - days_alloc[person]}d, {int(percentage_days_worked)}% utilization."
+            notifications.append(Notification(Severity.INFO, s))
+            print(s)
+        else:
+            s = f"{person} - working {days_alloc[person]}d, {int(percentage_days_worked)}% utilization."
+            notifications.append(Notification(Severity.INFO, s))
+            print(s)
 
     # Other dates and decorations.
     calculate_jit_dates(G)
@@ -281,13 +296,32 @@ def compute_graph_metrics(parsed_content, metadata, notifications):
     bad_start_end_dates = find_bad_start_end_dates(G, notifications)
     bad_start_end_dates = bad_start_end_dates or find_start_next_before_end(G, notifications)
 
+    assignments = []
+
+    tmp = set()
+    # Have to add back whateveer got pruned / what I don't have an assignment for
+    # This is getting very messy and we desperately need to clean up these abstractions
+    for r in ret:
+        tmp.add(r.task_name)
+
+    for i, r in enumerate(G):
+        if r.name not in tmp:
+            assert not r.scheduler_assigned
+            r.scheduler_assigned.extend(r.user_assigned)
+            assignments.append((r.name, r.start_date.strftime('%Y-%m-%d'), r.end_date.strftime('%Y-%m-%d'), ','.join([a for a in r.user_assigned])))
+
+    for assignment in ret:
+        start_date = busdays_offset(valid_date, assignment.start).strftime('%Y-%m-%d')
+        end_date = busdays_offset(valid_date, assignment.end).strftime('%Y-%m-%d')
+        assignments.append((assignment.task_name, start_date, end_date, assignment.person_name))
+
     # dont bother computing more metrics if there wasn't much intention behind the estimates
     if bad_start_end_dates:
         notifications.append(Notification(Severity.INFO, "Bad start and end dates prevent computation of more advanced metrics and alerts. Stopping."))
-        return G
+        return G, assignments
 
     # Check if any items aren't started that must have been started.
     check_start_dates(G, notifications, 3, datetime.now().date())
 
     # All done.
-    return G
+    return G, assignments

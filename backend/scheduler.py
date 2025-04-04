@@ -130,6 +130,13 @@ class AssigningScheduler():
         cal.add(self.forwards_calendar)
         return cal
 
+class MixedIntegerLinearProgrammingScheduler(AssigningScheduler):
+    def _schedule(self, people, cal, task, backwards):
+        print(people)
+        print(cal)
+        print(task)
+        print(backwards)
+
 # A scheduler that levels out a project to avoid overallocating people to
 # tasks, using the rule that each person can only work on one task on
 # any given day. The days don't need to be contiguous, though, if the task

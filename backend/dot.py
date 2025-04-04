@@ -1,6 +1,7 @@
 import base64
 import subprocess
 import tempfile
+import os
 
 import textwrap
 import html
@@ -37,22 +38,20 @@ def dot_task(task):
     estimate       = style_text(f"{task.estimate}d  ({task.buffer}d buf)", italic = task.gen_estimate)
     estimate_color = 'lightgray' if task.gen_estimate else 'white'
 
-    border_width = 1
+    border_width = 2
     border_color = 'black'
     if task.late:
-        border_width = 3
+        border_width = 4
         border_color = 'red'
     elif task.active:
-        border_width = 3
+        border_width = 4
         border_color = 'lightgreen'
     elif task.soon:
-        border_width = 3
+        border_width = 4
         border_color = 'lightyellow'
 
-    if len(task.assignees) > 0:
-        assignees = ', '.join(task.assignees)
-    else:
-        assignees = ', '.join(task.assigned)
+    if len(task.scheduler_assigned) > 0:
+        assignees = ', '.join(task.scheduler_assigned)
     assignee_color = 'pink' if task.contended else 'white'
 
     # Milestones are tasks with zero days estimated effort.
@@ -61,7 +60,7 @@ def dot_task(task):
             f"{task.id} [label=<"
             f"<table border='1' cellborder='1' cellspacing='0'><tr><td>{title}</td></tr>"
             f"<tr><td bgcolor='{end_color}'>{end_date}</td></tr>"
-            f"<tr><td>{wrap_desc}</td></tr></table>"
+            f"<tr><td bgcolor='#FFD580'> {wrap_desc}</td></tr></table>"
             f">];"
         )
 
@@ -98,7 +97,7 @@ def generate_dot_file(G):
     # Graph top-level.
     dot_file = (
         'digraph Items {\n'
-        'rankdir=TB;\n'
+        'rankdir=LR;\n'
         'node [fontname="Calibri,sans-serif" fontsize="12pt" shape=plaintext];\n'
         'edge [fontname="Calibri,sans-serif" fontsize="10pt"];\n'
     )
@@ -113,7 +112,7 @@ def generate_dot_file(G):
         label = ''
         if edge[Edge.critical]:
             color = 'black'
-            width = 2        
+            width = 4        
         if edge[Edge.slack] > 0:
             label = f"+{edge[Edge.slack]}d"
         elif edge[Edge.slack] < 0:
@@ -138,6 +137,7 @@ def generate_svg_graph(G):
 
     # Call Graphviz dot to render PNG
     print(output_svg_path)
-    subprocess.run(['dot', '-Tsvg', dotfile_path, '-o', output_svg_path], check=True)
+    dot_path = os.getenv('DOT_PATH', 'dot')
+    subprocess.run([dot_path, '-Tsvg', dotfile_path, '-o', output_svg_path], check=True)
     with open(output_svg_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
