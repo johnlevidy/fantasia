@@ -8,7 +8,7 @@ def verify_inputs(m: Metadata, tasks: list[InputTask]) -> None:
     for t in tasks:
         for a in t.assignees:
             if Person(a) not in m.people:
-                raise Exception(f"InputTask definition {t.name} contained assignee {p} who is not defined in a team. Known people: {m.people}")
+                raise Exception(f"InputTask definition {t.name} contained assignee {a} who is not defined in a team. Known people: {m.people}")
 
 def find_cycle(G: nx.Graph) -> Optional[Any]: 
     try:

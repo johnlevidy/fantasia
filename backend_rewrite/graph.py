@@ -1,10 +1,13 @@
 from typing import Dict
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 import networkx as nx
 
-from .dateutil import busdays_offset, parse_date
-from .types import InputTask, Metadata, Edge
+from .notification import Notification, Severity
+
+from .dateutil import busdays_between
+from .types import InputTask, Metadata, Edge, Decoration
 
 # Build a networkx graph out of the parsed content
 def build_graph(task_list: list[InputTask], metadata: Metadata):
@@ -19,6 +22,12 @@ def build_graph(task_list: list[InputTask], metadata: Metadata):
     G = nx.DiGraph()
     for task in tasks.values():
         G.add_node(task)
+
+    for task in tasks.values():
+        for next in task.next:
+            if next not in tasks:
+                raise Exception(f"Task {task.name} declares next {next} which is not itself a task.")
+
     for u, v in edges:
         if u in tasks and v in tasks:
             G.add_edge(tasks[u], tasks[v], **{
@@ -26,9 +35,6 @@ def build_graph(task_list: list[InputTask], metadata: Metadata):
                 Edge.slack    : 0,
                 Edge.critical : False
             })
-        else:
-            # TODO this edge points to an undefined Task; let the user know.
-            pass
 
     return G
 
@@ -65,3 +71,38 @@ def merge_graphs(upper: nx.DiGraph, lower: nx.DiGraph,
             subtasks = ','.join([t.name for t in ts_specific[task]])
             print(f"Merging a specific task: {task.name}. [{subtasks}]")
             merge_specific(task, ts_specific[task])
+
+def decorate_and_notify(G: nx.DiGraph, notifications: list[Notification]) -> Dict[InputTask, Decoration]:
+    ret: Dict[InputTask, Decoration] = dict()
+
+    # Prepare decorations, build days worked
+    days_alloc  = defaultdict(int)
+
+    task: InputTask
+    for task in G:
+        ret[task] = Decoration(False)
+        for a in task.assignees:
+            days_alloc[a] += task.estimate
+        for succ in G.successors(task):
+            G.edges[task, succ][Edge.slack] = busdays_between(task.end_date, succ.start_date)
+
+    # Tag the critical path.
+    critical_path = nx.dag_longest_path(G)
+    makespan = 0
+    for task in critical_path:
+        ret[task].critical = True
+        makespan += task.estimate
+    for edge in zip(critical_path, critical_path[1:]):
+        G.edges[edge][Edge.critical] = True
+    
+    # Provide some metrics on utilization
+    for person in sorted(days_alloc.keys()):
+        percentage_days_worked = (days_alloc[person] / makespan) * 100
+        s = f"{person} - working {days_alloc[person]}d, {int(percentage_days_worked)}% utilization."
+        notifications.append(Notification(Severity.INFO, s))
+    
+   #          s = f"{person} - working {days_alloc[person]}d, {int(percentage_days_worked)}% utilization."
+   #          notifications.append(Notification(Severity.INFO, s))
+   #      notifications.append(Notification(Severity.ERROR, f"Schedule was discovered only by rolling back {today} to {valid_date}"))
+   #          notifications.append(Notification(Severity.INFO, f"Task {task} starts on {start_date}, which is within {buffer_days} business days from today ({today_date}). Status: {status}. Check readiness."))
+    return ret 

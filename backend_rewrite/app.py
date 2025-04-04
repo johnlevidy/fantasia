@@ -1,5 +1,6 @@
 from collections import defaultdict
 import traceback
+from typing import Dict
 import uuid
 from .dot import generate_svg_graph
 from backend.app import parse_to_python
@@ -7,11 +8,12 @@ from flask import Flask, request, jsonify, render_template, session
 from .notification import Notification
 
 from backend_rewrite.graph_metrics import output_graph_metrics
+from .types import InputTask, Decoration
 from .parse_csv import csv_string_to_task_list 
 from .metadata import extract_metadata
 from .verify import verify_inputs, verify_graph
 from .scheduler import find_solution
-from .graph import build_graph, merge_graphs
+from .graph import build_graph, merge_graphs, decorate_and_notify
 from .expand import expand_specific_tasks, expand_parallelizable_tasks
 import os
 
@@ -50,7 +52,7 @@ def merge_data_with_rows(data, task_to_input_row_idx):
 def process():
     try:
         content = request.get_json()['content']
-        notifications: list[Notification] = []
+        notifications: list[Notification] = list()
 
         # Make the python data structure and extract metadata
         # then verify the inputs are consistent
@@ -79,9 +81,10 @@ def process():
         merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
 
         # Decorate G before rendering
+        decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, notifications)
 
         response = {
-            "image": generate_svg_graph(G),
+            "image": generate_svg_graph(G, decorations),
             "notifications": [n.to_dict() for n in notifications], 
         }
         return jsonify(response)

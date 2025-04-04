@@ -1,8 +1,11 @@
 import base64
+from datetime import datetime
+from typing import Dict
 import subprocess
 import tempfile
 import os
 
+from .dateutil import busdays_between
 import textwrap
 import html
 from .types import *
@@ -19,6 +22,7 @@ def style_text(text, **kwargs):
     if bold:   s = f"<b>{s}</b>"
     
     return s
+
 # Deprecated
 # gen_start -- because it's always either provided or generated now, there's no 
 # thing where it assigns an initial one then massages it. easy enough for user
@@ -32,28 +36,38 @@ def style_text(text, **kwargs):
 # late -- same as active
 # contended -- cant happen anymore
 
-def dot_task(task):
+SOON_THRESHOLD = 3
+
+def dot_task(task: InputTask, decoration: Decoration):
     wrap_desc      = '<br/>'.join(textwrap.wrap(html.escape(task.description), width=70))
-    title          = title_format(style_text(task.name, bold = task.critical))
+    title          = title_format(style_text(task.name, bold = decoration.critical))
 
-    start_date     = style_text(task.start_date,  italic = task.gen_start)
-    start_color    = 'lightgray' if task.gen_start else 'white'
+    start_date     = style_text(task.start_date)
+    start_color    = 'white'
 
-    end_date       = style_text(f'{task.end_date}', italic = task.gen_end)
-    end_color      = 'lightgray' if task.gen_end else 'white'
+    end_date       = style_text(f'{task.end_date}')
+    end_color      = 'white'
 
-    estimate       = style_text(f"{task.estimate}d  ({task.buffer}d buf)")
+    estimate       = style_text(f"{task.estimate}d")
     estimate_color = 'white'
 
     border_width = 2
     border_color = 'black'
-    if task.late:
+    today = datetime.now().date()
+    assert task.start_date
+    assert task.end_date
+    if today > task.end_date:
         border_width = 4
         border_color = 'red'
-    elif task.active:
-        border_width = 4
-        border_color = 'lightgreen'
-    elif task.soon:
+    # As long as it's in progress it's OK
+    elif today >= task.start_date:
+        if task.status != Status.InProgress:
+            border_width = 4
+            border_color = 'red'
+        else:
+            border_width = 4
+            border_color = 'lightgreen'
+    elif busdays_between(today, task.start_date) <= SOON_THRESHOLD:
         border_width = 4
         border_color = 'lightyellow'
 
@@ -64,7 +78,7 @@ def dot_task(task):
     # Milestones are tasks with zero days estimated effort.
     if task.estimate == 0:
         return (
-            f"{task.id} [label=<"
+            f"{task.scheduler_fields.id} [label=<"
             f"<table border='1' cellborder='1' cellspacing='0'><tr><td>{title}</td></tr>"
             f"<tr><td bgcolor='{end_color}'>{end_date}</td></tr>"
             f"<tr><td bgcolor='#FFD580'> {wrap_desc}</td></tr></table>"
@@ -73,16 +87,16 @@ def dot_task(task):
 
     # A regular task.
     match task.status:
-        case 'done':
+        case Status.Completed:
             return (
-                f"{task.id} [label=<"
+                f"{task.scheduler_fields.id} [label=<"
                 f"<table border='1' color='lightblue' cellborder='1' cellspacing='0'><tr><td color='black' bgcolor='lightblue'>{title} (done)</td></tr>"
                 f"<tr><td color='black' bgcolor='{end_color}'>{end_date}</td></tr></table>"
                 f">];"
             )
-        case 'not started':
+        case Status.NotStarted:
             return (
-                f"{task.id} [label=<"
+                f"{task.scheduler_fields.id} [label=<"
                 f"<table border='{border_width}' color='{border_color}' cellborder='1' cellspacing='0'><tr><td color='black' colspan='2'>{title}</td></tr>"
                 f"<tr><td color='black' bgcolor='{start_color}'>{start_date}</td><td color='black' bgcolor='{end_color}'>{end_date}</td></tr>"
                 f"<tr><td color='black' bgcolor='{assignee_color}'>{assignees}</td><td color='black' bgcolor='{estimate_color}'>{estimate}</td></tr>"
@@ -92,7 +106,7 @@ def dot_task(task):
         case _:
             status_color = 'red' if task.status == 'blocked' else 'lightgreen' if task.status == 'in progress' else 'white'
             return (
-                f"{task.id} [label=<"
+                f"{task.scheduler_fields.id} [label=<"
                 f"<table border='{border_width}' color='{border_color}' cellborder='1' cellspacing='0'><tr><td color='black' colspan='3' bgcolor='{status_color}'>{title}</td></tr>"
                 f"<tr><td color='black' bgcolor='{start_color}'>{start_date}</td><td color='black' bgcolor='{status_color}'>{task.status}</td><td color='black' bgcolor='{end_color}'>{end_date}</td></tr>"
                 f"<tr><td color='black' bgcolor='{assignee_color}' colspan='2'>{assignees}</td><td color='black' bgcolor='{estimate_color}'>{estimate}</td></tr>"
@@ -100,7 +114,7 @@ def dot_task(task):
                 f">];"
             )
 
-def generate_dot_file(G):
+def generate_dot_file(G, decorations: Dict[InputTask, Decoration]):
     # Graph top-level.
     dot_file = (
         'digraph Items {\n'
@@ -110,7 +124,7 @@ def generate_dot_file(G):
     )
 
     # Write out all task nodes.
-    dot_file += '\n'.join([dot_task(task) for task in G.nodes])
+    dot_file += '\n'.join([dot_task(task, decorations[task]) for task in G.nodes])
 
     # Add in the edges.
     for u, v, edge in G.edges(data=True):
@@ -131,8 +145,8 @@ def generate_dot_file(G):
     return dot_file
 
 # Generate dot content and return b64 encoded representation
-def generate_svg_graph(G):
-    dot_content = generate_dot_file(G)
+def generate_svg_graph(G, decorations):
+    dot_content = generate_dot_file(G, decorations)
     
     # Save dot_content to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.dot') as dotfile:

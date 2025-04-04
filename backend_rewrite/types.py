@@ -60,6 +60,10 @@ class SchedulerAssignment:
     assignee: int
 
 @dataclass
+class Decoration:
+    critical: bool
+
+@dataclass
 class InputTask:
     name: str
     description: str
@@ -77,19 +81,6 @@ class InputTask:
 
     # Added and edited by scheduler
     scheduler_fields: SchedulerFields = field(default_factory=lambda: SchedulerFields(0, [], [], 0, 0, 0))
-
-    # Added on at the end before rendering
-    critical: bool = False
-    buffer: int = 0
-    gen_start: bool = False
-    gen_end: bool = False
-    id: int = 0
-
-    def late(self, today: date):
-        if self.end_date:
-            return today > self.end_date
-        else:
-            return False
 
     def __hash__(self):
         return hash(self.name)
