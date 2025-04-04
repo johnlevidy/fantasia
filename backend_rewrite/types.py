@@ -3,6 +3,8 @@ from typing import Optional
 from enum import Enum, StrEnum, auto
 from datetime import date
 
+SOON_THRESHOLD = 3
+
 # Edges only have dicts to store data; use a StrEnum to define the keys we use.
 class Edge(StrEnum):
     weight   = auto()  # int; the weight of the edge, based on the ancestor task estimate.

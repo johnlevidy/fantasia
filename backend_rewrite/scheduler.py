@@ -6,7 +6,8 @@ from copy import deepcopy
 from typing import Tuple, Dict, Optional
 from bidict import bidict 
 
-from .types import Metadata, SchedulerAssignment, Person, InputTask, SchedulerFields
+from .types import *
+from .notification import *
 from ortools.sat.python import cp_model
 from networkx import DiGraph
 
@@ -174,7 +175,7 @@ def densify_dates(today: date, start: Optional[date], end: Optional[date], horiz
 # We need the subtasks mapping because specifically for the
 # ones with multiple "specific" assignments we need to ensure
 # they have the same start / end date
-def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[InputTask]]) -> None:
+def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[InputTask]], notifications: list[Notification]) -> bool:
     # Build dense Person / PersonId 
     person_to_person_id: bidict[Person, int] = bidict()
     task_to_task_id: bidict[InputTask, int] = bidict()
@@ -184,26 +185,33 @@ def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[Inp
     for p in m.people_allocations.keys():
         person_to_person_id[p] = id
         id += 1
-    task: InputTask
     horizon = sum([task.estimate for task in G])
 
-    # Expand assignees, densify dates and task_id
-    id = 0
-    today = datetime.datetime.now().date()
-    for task in G:
-        specific, pool = get_assignees(task, m, person_to_person_id)
-        s, e = densify_dates(today, task.start_date, task.end_date, horizon)
-        task.scheduler_fields = SchedulerFields(id, pool, specific, s, e, task.estimate)
-        task_to_task_id[task] = id
-        id += 1
+    today: date = datetime.datetime.now().date()
+    for offset in range(0, 20, 5):
+        # Expand assignees, densify dates and task_id
+        id = 0
+        today = busdays_offset(today, -offset)
+        task: InputTask
+        for task in G:
+            specific, pool = get_assignees(task, m, person_to_person_id)
+            s, e = densify_dates(today, task.start_date, task.end_date, horizon)
+            task.scheduler_fields = SchedulerFields(id, pool, specific, s, e, task.estimate)
+            task_to_task_id[task] = id
+            id += 1
 
-    # At this point all scheduler fields are ready, we can attempt a solution no
-    assignments: Dict[InputTask, SchedulerAssignment] = schedule(G, m, person_to_person_id, horizon, ts_specific)
-
-    # Apply the solution to the original graph
-    # if we found one
-    for task in G:
-        assignment: SchedulerAssignment = assignments[task]
-        task.start_date = busdays_offset(today, assignment.start_date)
-        task.end_date = busdays_offset(today, assignment.end_date)
-        task.assignees = [person_to_person_id.inv[assignment.assignee].name]
+        # At this point all scheduler fields are ready, we can attempt a solution no
+        assignments: Dict[InputTask, SchedulerAssignment] = schedule(G, m, person_to_person_id, horizon, ts_specific)
+        if assignments:
+            # Apply the solution to the original graph
+            # if we found one
+            for task in G:
+                assignment: SchedulerAssignment = assignments[task]
+                task.start_date = busdays_offset(today, assignment.start_date)
+                task.end_date = busdays_offset(today, assignment.end_date)
+                task.assignees = [person_to_person_id.inv[assignment.assignee].name]
+            if offset != 0:
+                notifications.append(Notification(Severity.WARN, f"Schedule only discovered by rolling back to {today}"))
+            return True
+    notifications.append(Notification(Severity.WARN, f"Unable to find a schedule after rolling back to {today}"))
+    return False

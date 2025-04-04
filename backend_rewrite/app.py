@@ -7,7 +7,6 @@ from backend.app import parse_to_python
 from flask import Flask, request, jsonify, render_template, session
 from .notification import Notification
 
-from backend_rewrite.graph_metrics import output_graph_metrics
 from .types import InputTask, Decoration
 from .parse_csv import csv_string_to_task_list 
 from .metadata import extract_metadata
@@ -63,8 +62,6 @@ def process():
         # Build the upper graph and verify it
         G = build_graph(tasks, metadata)
         verify_graph(G)
-        # Append notifications with some helpful metrics
-        output_graph_metrics(G, notifications)
 
         # Expand the tasks into subtasks where appropriate
         tasks, specific_subtasks = expand_specific_tasks(tasks)
@@ -75,13 +72,15 @@ def process():
         verify_graph(L)
 
         # Do the scheduling, note that this statefully updates L
-        find_solution(L, metadata, specific_subtasks)
+        found_solution: bool = find_solution(L, metadata, specific_subtasks, notifications)
 
         # Merge L back onto G
-        merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
+        if found_solution:
+            merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
 
         # Decorate G before rendering
         decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, notifications)
+
 
         response = {
             "image": generate_svg_graph(G, decorations),

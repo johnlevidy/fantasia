@@ -7,7 +7,7 @@ import networkx as nx
 from .notification import Notification, Severity
 
 from .dateutil import busdays_between
-from .types import InputTask, Metadata, Edge, Decoration
+from .types import InputTask, Metadata, Edge, Decoration, SOON_THRESHOLD
 
 # Build a networkx graph out of the parsed content
 def build_graph(task_list: list[InputTask], metadata: Metadata):
@@ -74,9 +74,15 @@ def merge_graphs(upper: nx.DiGraph, lower: nx.DiGraph,
 
 def decorate_and_notify(G: nx.DiGraph, notifications: list[Notification]) -> Dict[InputTask, Decoration]:
     ret: Dict[InputTask, Decoration] = dict()
+ 
+    total_work = sum(task.estimate for task in G.nodes)
+    longest_path = nx.dag_longest_path_length(G)
+    parallelism_ratio = total_work / longest_path 
+    notifications.append(Notification(Severity.INFO, f"[Total Length: {total_work}], [Critical Path Length: {longest_path}], [Parallelism Ratio: {parallelism_ratio:.2f}]"))
 
     # Prepare decorations, build days worked
     days_alloc  = defaultdict(int)
+    today = datetime.now().date()
 
     task: InputTask
     for task in G:
@@ -84,7 +90,10 @@ def decorate_and_notify(G: nx.DiGraph, notifications: list[Notification]) -> Dic
         for a in task.assignees:
             days_alloc[a] += task.estimate
         for succ in G.successors(task):
-            G.edges[task, succ][Edge.slack] = busdays_between(task.end_date, succ.start_date)
+            if task.end_date and succ.start_date:
+                G.edges[task, succ][Edge.slack] = busdays_between(task.end_date, succ.start_date)
+        if task.start_date and busdays_between(today, task.start_date) <= SOON_THRESHOLD:
+            notifications.append(Notification(Severity.INFO, f"Task {task.name} starts on {task.start_date}, which is within {SOON_THRESHOLD} business days from today. Status: {task.status}. Check readiness."))
 
     # Tag the critical path.
     critical_path = nx.dag_longest_path(G)
@@ -100,9 +109,4 @@ def decorate_and_notify(G: nx.DiGraph, notifications: list[Notification]) -> Dic
         percentage_days_worked = (days_alloc[person] / makespan) * 100
         s = f"{person} - working {days_alloc[person]}d, {int(percentage_days_worked)}% utilization."
         notifications.append(Notification(Severity.INFO, s))
-    
-   #          s = f"{person} - working {days_alloc[person]}d, {int(percentage_days_worked)}% utilization."
-   #          notifications.append(Notification(Severity.INFO, s))
-   #      notifications.append(Notification(Severity.ERROR, f"Schedule was discovered only by rolling back {today} to {valid_date}"))
-   #          notifications.append(Notification(Severity.INFO, f"Task {task} starts on {start_date}, which is within {buffer_days} business days from today ({today_date}). Status: {status}. Check readiness."))
     return ret 

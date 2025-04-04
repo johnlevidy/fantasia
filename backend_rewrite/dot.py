@@ -36,8 +36,6 @@ def style_text(text, **kwargs):
 # late -- same as active
 # contended -- cant happen anymore
 
-SOON_THRESHOLD = 3
-
 def dot_task(task: InputTask, decoration: Decoration):
     wrap_desc      = '<br/>'.join(textwrap.wrap(html.escape(task.description), width=70))
     title          = title_format(style_text(task.name, bold = decoration.critical))
@@ -54,20 +52,18 @@ def dot_task(task: InputTask, decoration: Decoration):
     border_width = 2
     border_color = 'black'
     today = datetime.now().date()
-    assert task.start_date
-    assert task.end_date
-    if today > task.end_date:
+    if task.end_date and today > task.end_date:
         border_width = 4
         border_color = 'red'
     # As long as it's in progress it's OK
-    elif today >= task.start_date:
+    elif task.start_date and today >= task.start_date:
         if task.status != Status.InProgress:
             border_width = 4
             border_color = 'red'
         else:
             border_width = 4
             border_color = 'lightgreen'
-    elif busdays_between(today, task.start_date) <= SOON_THRESHOLD:
+    elif task.start_date and busdays_between(today, task.start_date) <= SOON_THRESHOLD:
         border_width = 4
         border_color = 'lightyellow'
 
