@@ -139,7 +139,7 @@ def generate_dot_file(G, decorations: Dict[InputTask, Decoration]):
         elif edge[Edge.slack] < 0:
             color = 'red'
             label = f"late {abs(edge[Edge.slack])}d"            
-        dot_file += f"{u.id} -> {v.id} [color={color}, penwidth={width}, label=\"{label}\"];\n"
+        dot_file += f"{u.scheduler_fields.id} -> {v.scheduler_fields.id} [color={color}, penwidth={width}, label=\"{label}\"];\n"
 
     dot_file += '}\n'
     return dot_file

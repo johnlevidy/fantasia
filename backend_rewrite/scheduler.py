@@ -31,7 +31,8 @@ def register_task_start_end(model: cp_model.CpModel, task: InputTask, horizon: i
     task_ends[id] = end_var
 
 # Find a valid schedule, return assignments
-def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person, int], horizon: int) -> Dict[InputTask, SchedulerAssignment]:
+def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person, int],
+             horizon: int, ts_specific: Dict[InputTask, list[InputTask]]) -> Dict[InputTask, SchedulerAssignment]:
     model: cp_model.CpModel = cp_model.CpModel()
 
     # Model Variables
@@ -57,7 +58,13 @@ def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person,
     # -------------------------------------------------------------
     # Build constraints around ensuring subtasks of multi-assignments
     # are worked on simultaneously
-    # TODO have to do this this has to happen
+    for task in G:
+        for s in ts_specific.get(task, []):
+            model.Add(task_starts[task.scheduler_fields.id] ==
+                      task_starts[s.scheduler_fields.id])
+            model.Add(task_ends[task.scheduler_fields.id] ==
+                      task_ends[s.scheduler_fields.id])
+
     # Force all subtasks to match the first start / end
     # model.Add(starts[subtasks[0]] == starts[subtasks[i]])
     # model.Add(ends[subtasks[0]] == ends[subtasks[i]])
@@ -164,7 +171,10 @@ def densify_dates(today: date, start: Optional[date], end: Optional[date], horiz
 # 1. Expand assignees into eligible assignees
 # 2. Assign unique people_id to Person
 # 3. Assign unique task_id to task
-def find_solution(G: DiGraph, m: Metadata) -> None:
+# We need the subtasks mapping because specifically for the
+# ones with multiple "specific" assignments we need to ensure
+# they have the same start / end date
+def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[InputTask]]) -> None:
     # Build dense Person / PersonId 
     person_to_person_id: bidict[Person, int] = bidict()
     task_to_task_id: bidict[InputTask, int] = bidict()
@@ -188,13 +198,12 @@ def find_solution(G: DiGraph, m: Metadata) -> None:
         id += 1
 
     # At this point all scheduler fields are ready, we can attempt a solution no
-    assignments: Dict[InputTask, SchedulerAssignment] = schedule(G, m, person_to_person_id, horizon)
+    assignments: Dict[InputTask, SchedulerAssignment] = schedule(G, m, person_to_person_id, horizon, ts_specific)
 
     # Apply the solution to the original graph
     # if we found one
     for task in G:
         assignment: SchedulerAssignment = assignments[task]
-        task.id = assignment.id
         task.start_date = busdays_offset(today, assignment.start_date)
         task.end_date = busdays_offset(today, assignment.end_date)
         task.assignees = [person_to_person_id.inv[assignment.assignee].name]

@@ -75,7 +75,7 @@ def process():
         verify_graph(L)
 
         # Do the scheduling, note that this statefully updates L
-        find_solution(L, metadata)
+        find_solution(L, metadata, specific_subtasks)
 
         # Merge L back onto G
         merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
