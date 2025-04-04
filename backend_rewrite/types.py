@@ -94,14 +94,12 @@ class Team:
 
 class Metadata:
     teams: dict[str, Team] = dict()
-    people: set[Person] = set()
     people_allocations: dict[Person, float] = dict()
 
     # Add the person, only add the allocation if new 
     def add_person(self, person: Person):
-        if person not in self.people:
+        if person not in self.people_allocations:
             self.people_allocations[person] = 1.0
-        self.people.add(person)
     
     # Add the person, then add the allocation, always override
     def add_allocation(self, person: Person, allocation: float):

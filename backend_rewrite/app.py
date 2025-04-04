@@ -7,7 +7,7 @@ from backend.app import parse_to_python
 from flask import Flask, request, jsonify, render_template, session
 from .notification import Notification
 
-from .types import InputTask, Decoration
+from .types import *
 from .parse_csv import csv_string_to_task_list 
 from .metadata import extract_metadata
 from .verify import verify_inputs, verify_graph
@@ -47,6 +47,28 @@ def merge_data_with_rows(data, task_to_input_row_idx):
         result[task_to_input_row_idx[task_name]] = assignment[1:]
     return result
 
+def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notifications: list[Notification]):
+    # Build the upper graph and verify it
+    G = build_graph(tasks, metadata)
+    verify_graph(G)
+
+    # Expand the tasks into subtasks where appropriate
+    tasks, specific_subtasks = expand_specific_tasks(tasks)
+    tasks, parallelizable_subtasks = expand_parallelizable_tasks(tasks)
+    
+    # Build the lower graph and verify it
+    L = build_graph(tasks, metadata)
+    verify_graph(L)
+
+    # Do the scheduling, note that this statefully updates L
+    makespan, offset = find_solution(L, metadata, specific_subtasks, notifications)
+
+    if makespan >= 0:
+        # Merge L back onto G
+        merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
+
+    return G, makespan, offset
+
 @app.route('/process', methods=['POST'])
 def process():
     try:
@@ -58,29 +80,11 @@ def process():
         metadata = extract_metadata(content, '\t')
         tasks = csv_string_to_task_list(content, '\t', metadata)
         verify_inputs(metadata, tasks)
-
-        # Build the upper graph and verify it
-        G = build_graph(tasks, metadata)
-        verify_graph(G)
-
-        # Expand the tasks into subtasks where appropriate
-        tasks, specific_subtasks = expand_specific_tasks(tasks)
-        tasks, parallelizable_subtasks = expand_parallelizable_tasks(tasks)
         
-        # Build the lower graph and verify it
-        L = build_graph(tasks, metadata)
-        verify_graph(L)
-
-        # Do the scheduling, note that this statefully updates L
-        found_solution: bool = find_solution(L, metadata, specific_subtasks, notifications)
-
-        # Merge L back onto G
-        if found_solution:
-            merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
+        G, _, _ = build_graph_and_schedule(tasks, metadata, notifications)
 
         # Decorate G before rendering
         decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, notifications)
-
 
         response = {
             "image": generate_svg_graph(G, decorations),

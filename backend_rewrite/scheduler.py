@@ -33,7 +33,8 @@ def register_task_start_end(model: cp_model.CpModel, task: InputTask, horizon: i
 
 # Find a valid schedule, return assignments
 def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person, int],
-             horizon: int, ts_specific: Dict[InputTask, list[InputTask]]) -> Dict[InputTask, SchedulerAssignment]:
+             horizon: int, ts_specific: Dict[InputTask, list[InputTask]]) \
+             -> Tuple[Dict[InputTask, SchedulerAssignment], int]:
     model: cp_model.CpModel = cp_model.CpModel()
 
     # Model Variables
@@ -133,10 +134,10 @@ def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person,
     status = solver.Solve(model)
     if status in [cp_model.INFEASIBLE]:
         print("Overconstrained")
-        return dict()
+        return dict(), -1
     elif status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         print("No solution found.")
-        return dict()
+        return dict(), -1
     status_str = "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE"
     print(f'Minimal makespan {status_str}: {solver.Value(makespan)} days\n')
 
@@ -148,7 +149,7 @@ def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person,
         assignee = solver.Value(person_assignments[id])
         ret[task] = SchedulerAssignment(id, start, end, assignee)
 
-    return ret
+    return ret, solver.Value(makespan)
  
 # Returns a pair of specific, eligible
 def get_assignees(task: InputTask, metadata: Metadata, person_to_person_id: bidict[Person, int]) -> Tuple[list[int], list[int]]:
@@ -175,7 +176,7 @@ def densify_dates(today: date, start: Optional[date], end: Optional[date], horiz
 # We need the subtasks mapping because specifically for the
 # ones with multiple "specific" assignments we need to ensure
 # they have the same start / end date
-def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[InputTask]], notifications: list[Notification]) -> bool:
+def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[InputTask]], notifications: list[Notification]) -> Tuple[int, int]:
     # Build dense Person / PersonId 
     person_to_person_id: bidict[Person, int] = bidict()
     task_to_task_id: bidict[InputTask, int] = bidict()
@@ -188,6 +189,7 @@ def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[Inp
     horizon = sum([task.estimate for task in G])
 
     today: date = datetime.datetime.now().date()
+    offset: int = 0
     for offset in range(0, 20, 5):
         # Expand assignees, densify dates and task_id
         id = 0
@@ -201,7 +203,7 @@ def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[Inp
             id += 1
 
         # At this point all scheduler fields are ready, we can attempt a solution no
-        assignments: Dict[InputTask, SchedulerAssignment] = schedule(G, m, person_to_person_id, horizon, ts_specific)
+        assignments, makespan = schedule(G, m, person_to_person_id, horizon, ts_specific)
         if assignments:
             # Apply the solution to the original graph
             # if we found one
@@ -212,6 +214,6 @@ def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[Inp
                 task.assignees = [person_to_person_id.inv[assignment.assignee].name]
             if offset != 0:
                 notifications.append(Notification(Severity.WARN, f"Schedule only discovered by rolling back to {today}"))
-            return True
+            return makespan, offset
     notifications.append(Notification(Severity.WARN, f"Unable to find a schedule after rolling back to {today}"))
-    return False
+    return -1, offset
