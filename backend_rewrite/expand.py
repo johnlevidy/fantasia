@@ -11,6 +11,7 @@ def expand_parallelizable_tasks(tasks: list[InputTask]) -> Tuple[list[InputTask]
 
     for t in tasks:
         if t.parallelizable:
+            print(f"Splitting parallel {t.name} with start {t.start_date} end {t.end_date}")
             original_to_subtasks[t] = []
             assert t.estimate and t.estimate >= 2
             original_estimate = t.estimate
