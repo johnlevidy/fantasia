@@ -1,6 +1,6 @@
 from collections import defaultdict
 import traceback
-from typing import Dict
+from typing import Dict, Tuple
 import uuid
 from .dot import generate_svg_graph
 from backend.app import parse_to_python
@@ -20,7 +20,8 @@ app = Flask(__name__, static_folder='../frontend/static', template_folder='../fr
 
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 
-last_plan = defaultdict(list)
+# uuid -> semi structured view of the last plan
+last_plan:  Dict[str, list[Tuple[str, str, str]]] = defaultdict()
 
 def get_user_id():
     if 'user_id' not in session:
@@ -37,14 +38,18 @@ def get_copy_text():
     response = { "text": '\n'.join(['\t'.join(l) if l else "\t\t\t" for l in last_plan.get(get_user_id(), [])])}
     return jsonify(response)
 
-# The user might have given us data with blank rows
-# in their sheet ( or uninterpretable ones as a task )
-# for aesthetic reasons or otherwise. This is to handle that case.
-def merge_data_with_rows(data, task_to_input_row_idx):
-    result = [None] * (max([a for a in task_to_input_row_idx.values()]) + 1)
-    for assignment in data:
-        task_name = assignment[0]
-        result[task_to_input_row_idx[task_name]] = assignment[1:]
+# Converting to string now makes our life a bit easier later
+def build_plan(G) -> list[Tuple[str, str, str]]:
+    task_to_input_row_idx = {}
+    for task in G:
+        task_to_input_row_idx[task.name] = task.input_row_idx
+
+    result = [None] * (max([a.input_row_idx for a in G]) * 2)
+    for task in G:
+        start_string = task.start_date.strftime('%Y-%m-%d') if task.start_date else ''
+        end_string = task.end_date.strftime('%Y-%m-%d') if task.end_date else ''
+        result[task_to_input_row_idx[task.name]] = (start_string, end_string, ','.join(task.assignees))
+
     return result
 
 def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notifications: list[Notification]):
@@ -81,7 +86,8 @@ def process():
         tasks = csv_string_to_task_list(content, '\t', metadata)
         verify_inputs(metadata, tasks)
         
-        G, _, _ = build_graph_and_schedule(tasks, metadata, notifications)
+        G, makespan, _ = build_graph_and_schedule(tasks, metadata, notifications)
+        last_plan[get_user_id()] = build_plan(G) if makespan >= 0 else []
 
         # Decorate G before rendering
         decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, notifications)

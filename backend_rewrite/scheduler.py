@@ -92,13 +92,16 @@ def schedule(G: DiGraph, metadata: Metadata, person_to_person_id: bidict[Person,
     # Tasks must end before their "latest end" assigned date
     task: InputTask
     for task in ValidTasks(G):
-        model.Add(task_ends[task.scheduler_fields.id] <= task.scheduler_fields.end_time)
+        model.Add(task_ends[task.scheduler_fields.id] <= task.scheduler_fields.latest_end)
+        model.Add(task_starts[task.scheduler_fields.id] >= task.scheduler_fields.earliest_start)
 
     # ---------------------------------------------------------------
     # Constrain that successor items start after the end of the deps
     task: InputTask
     for task in ValidTasks(G):
         for successor in G.successors(task):
+            if successor.scheduler_fields.exclude:
+                raise Exception(f"May not have task: {task.name} depending on {successor.name} when {task.name} is not done ( no end date ) but {successor.name} is")
             model.Add(task_starts[successor.scheduler_fields.id] >= task_ends[task.scheduler_fields.id])
 
     # ---------------------------------------------------------------
@@ -184,10 +187,27 @@ def get_assignees(task: InputTask, metadata: Metadata, person_to_person_id: bidi
 
     return [], list(pool)
 
-def densify_dates(today: date, start: Optional[date], end: Optional[date], horizon: int) -> Tuple[int, int]:
-    s = busdays_between(today, start) if start else 0
-    e = busdays_between(today, end) if end else horizon
-    return s, e
+@dataclass
+class DateResult:
+    start_offset: int # Busdays from today until start
+    end_offset: int # Busdays from today until end
+    exclude: bool # whether or not to include this value
+    remaining_estimate: int # adjusted if today >= start / in progress
+
+def densify_dates(today: date, start: Optional[date], end: Optional[date], estimate: int, horizon: int) -> DateResult:
+    start_offset = busdays_between(today, start) if start else 0
+    end_offset = busdays_between(today, end) if end else horizon
+    exclude = end_offset < 0
+
+    # If not already started ( and assuming includced ) then
+    # end date must be after today. Assume it's still being worked on
+    if start_offset < 0:
+        scheduling_estimate = max(0, busdays_between(today, busdays_offset(start, estimate)))
+        start_offset = 0
+    else:
+        scheduling_estimate = estimate
+
+    return DateResult(start_offset, end_offset, exclude, scheduling_estimate)
 
 # 1. Expand assignees into eligible assignees
 # 2. Assign unique people_id to Person
@@ -209,18 +229,15 @@ def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[Inp
 
     today: date = datetime.datetime.now().date()
     offset: int = 0
-    for offset in range(0, 20, 5):
+    for offset in range(0, 80, 5):
         # Expand assignees, densify dates and task_id
         id = 0
-        today = busdays_offset(today, -offset)
+        today_offset = busdays_offset(today, -offset)
         task: InputTask
         for task in G:
             specific, pool = get_assignees(task, m, person_to_person_id)
-            s, e = densify_dates(today, task.start_date, task.end_date, horizon)
-            exclude = e < 0
-            # If it started already, estimate is however long ( remains ) to end
-            scheduling_estimate = task.estimate if s >= 0 else e
-            task.scheduler_fields = SchedulerFields(id, pool, specific, s, e, scheduling_estimate, exclude)
+            res: DateResult = densify_dates(today_offset, task.start_date, task.end_date, task.estimate, horizon)
+            task.scheduler_fields = SchedulerFields(id, pool, specific, res.start_offset, res.end_offset, res.remaining_estimate, res.exclude)
             task_to_task_id[task] = id
             id += 1
 
@@ -231,11 +248,11 @@ def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[Inp
             # if we found one
             for task in ValidTasks(G):
                 assignment: SchedulerAssignment = assignments[task]
-                task.start_date = busdays_offset(today, assignment.start_date)
-                task.end_date = busdays_offset(today, assignment.end_date)
+                task.start_date = busdays_offset(today_offset, assignment.start_date)
+                task.end_date = busdays_offset(today_offset, assignment.end_date)
                 task.assignees = [person_to_person_id.inv[assignment.assignee].name]
             if offset != 0:
-                notifications.append(Notification(Severity.WARN, f"Schedule only discovered by rolling back to {today}"))
+                notifications.append(Notification(Severity.WARN, f"Schedule only discovered by rolling back to {today_offset}"))
             return makespan, offset
     notifications.append(Notification(Severity.WARN, f"Unable to find a schedule after rolling back to {today}"))
     return -1, offset

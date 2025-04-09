@@ -19,6 +19,8 @@ def find_cycle(G: nx.Graph) -> Optional[Any]:
 # Finds nodes that end after the next node starts.
 def find_bad_dates(G: nx.DiGraph):
     for task in G.nodes:
+        if task.estimate < 0:
+            raise Exception(f"Got estimate: {task.estimate} -- expected positive value only")
         if not task.start_date or not task.end_date:
             continue
         if task.start_date >= task.end_date and task.estimate > 0:

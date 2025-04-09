@@ -50,8 +50,8 @@ class SchedulerFields:
     id: int
     eligible_assignees: list[int]
     assignees: list[int]
-    start_time: int
-    end_time: int
+    earliest_start: int
+    latest_end: int
     estimate: int
     exclude: bool
 
