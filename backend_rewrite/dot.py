@@ -46,15 +46,17 @@ def dot_task(task: InputTask, decoration: Decoration):
     end_date       = style_text(f'{task.end_date}')
     end_color      = 'white'
 
-    estimate       = style_text(f"{task.estimate}d")
-    estimate_color = 'white'
+    par_text = "(parallelizable)" if task.parallelizable else ""
+    estimate       = style_text(f"{task.estimate}d {par_text}")
+    estimate_color = 'white' if not task.parallelizable else 'yellow'
 
     border_width = 2
     border_color = 'black'
     today = datetime.now().date()
     if task.end_date and today > task.end_date:
-        border_width = 4
-        border_color = 'red'
+        if task.status != Status.Completed:
+            border_width = 4
+            border_color = 'red'
     # As long as it's in progress it's OK
     elif task.start_date and today >= task.start_date:
         if task.status != Status.InProgress:
@@ -63,7 +65,7 @@ def dot_task(task: InputTask, decoration: Decoration):
         else:
             border_width = 4
             border_color = 'lightgreen'
-    elif task.start_date and busdays_between(today, task.start_date) <= SOON_THRESHOLD:
+    elif task.start_date and task.start_date >= today and busdays_between(today, task.start_date) <= SOON_THRESHOLD:
         border_width = 4
         border_color = 'lightyellow'
 

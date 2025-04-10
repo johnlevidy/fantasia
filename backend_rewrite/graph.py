@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -67,7 +67,7 @@ def merge_graphs(upper: nx.DiGraph, lower: nx.DiGraph,
             print(f"Merging a specific task: {task.name}. [{subtasks}]")
             merge_specific(task, ts_specific[task])
 
-def decorate_and_notify(G: nx.DiGraph, notifications: list[Notification]) -> Dict[InputTask, Decoration]:
+def decorate_and_notify(G: nx.DiGraph, makespan: Optional[int], notifications: list[Notification]) -> Dict[InputTask, Decoration]:
     ret: Dict[InputTask, Decoration] = dict()
  
     total_work = sum(task.estimate for task in G.nodes)
@@ -83,22 +83,25 @@ def decorate_and_notify(G: nx.DiGraph, notifications: list[Notification]) -> Dic
     for task in G:
         ret[task] = Decoration(False)
         for a in task.assignees:
+            if not task.scheduler_fields.exclude: # bit of an abstraction break
+                days_alloc[a] += task.estimate if task.estimate else 0
             days_alloc[a] += task.estimate
         for succ in G.successors(task):
             if task.end_date and succ.start_date:
                 G.edges[task, succ][Edge.slack] = busdays_between(task.end_date, succ.start_date)
-        if task.start_date and busdays_between(today, task.start_date) <= SOON_THRESHOLD:
+        if task.start_date and task.start_date >= today and busdays_between(today, task.start_date) <= SOON_THRESHOLD:
             notifications.append(Notification(Severity.INFO, f"Task {task.name} starts on {task.start_date}, which is within {SOON_THRESHOLD} business days from today. Status: {task.status}. Check readiness."))
 
     # Tag the critical path.
     critical_path = nx.dag_longest_path(G)
-    makespan = 0
     for task in critical_path:
         ret[task].critical = True
-        makespan += task.estimate
     for edge in zip(critical_path, critical_path[1:]):
         G.edges[edge][Edge.critical] = True
     
+    if not makespan:
+        return ret
+
     # Provide some metrics on utilization
     for person in sorted(days_alloc.keys()):
         percentage_days_worked = (days_alloc[person] / makespan) * 100

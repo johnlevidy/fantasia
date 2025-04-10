@@ -1,6 +1,6 @@
 from typing import Dict, Tuple
 from copy import deepcopy
-from backend_rewrite.types import InputTask
+from backend_rewrite.types import InputTask, Status
 
 def expand_parallelizable_tasks(tasks: list[InputTask]) -> Tuple[list[InputTask], Dict[InputTask, list[InputTask]]]:
     # Handle assigning start and end dates properly in this case
@@ -30,6 +30,7 @@ def expand_parallelizable_tasks(tasks: list[InputTask]) -> Tuple[list[InputTask]
                 t_copy.estimate = 1
                 t_copy.start_date = None
                 t_copy.end_date = None
+                t_copy.status = Status.NotStarted
                 last_t.next = [t_copy.name]
                 tasks_to_add.append(t_copy)
                 last_t = t_copy

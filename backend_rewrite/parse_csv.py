@@ -7,16 +7,15 @@ from io import StringIO
 import csv
 
 # returns parallelizable, estimate, start, end, 
-def parse_dates_and_estimates(task_name: str, estimate: str, start_date: str, end_date: str) -> Tuple[bool, int, Optional[date], Optional[date]]:
+def parse_dates_and_estimates(task_name: str, estimate: str, start_date: str, end_date: str) -> Tuple[bool, Optional[int], Optional[date], Optional[date]]:
     start = parse_date(start_date) if start_date else None
     end = parse_date(end_date) if end_date else None
     parallelizable = False
     if not estimate:
+        est = None
         if start and end:
-            # Infer the estimate based on start / end
-            return parallelizable, busdays_between(start, end), start, end
-        else:
-            raise Exception(f"Got bad estimate for row {task_name} with no start / end: {estimate}")
+            est = busdays_between(start, end)
+        return parallelizable, est, start, end
 
     if estimate[0] == '~':
         estimate = estimate[1:]

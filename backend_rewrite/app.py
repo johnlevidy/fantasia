@@ -1,4 +1,5 @@
 from collections import defaultdict
+import networkx as nx
 import traceback
 from typing import Dict, Tuple
 import uuid
@@ -52,7 +53,7 @@ def build_plan(G) -> list[Tuple[str, str, str]]:
 
     return result
 
-def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notifications: list[Notification]):
+def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notifications: list[Notification]) -> Tuple[nx.DiGraph, Optional[int], int]:
     # Build the upper graph and verify it
     G = build_graph(tasks, metadata)
     verify_graph(G)
@@ -68,7 +69,7 @@ def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notific
     # Do the scheduling, note that this statefully updates L
     makespan, offset = find_solution(L, metadata, specific_subtasks, notifications)
 
-    if makespan >= 0:
+    if makespan:
         # Merge L back onto G
         merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
 
@@ -87,10 +88,10 @@ def process():
         verify_inputs(metadata, tasks)
         
         G, makespan, _ = build_graph_and_schedule(tasks, metadata, notifications)
-        last_plan[get_user_id()] = build_plan(G) if makespan >= 0 else []
+        last_plan[get_user_id()] = build_plan(G) if makespan and makespan >= 0 else []
 
         # Decorate G before rendering
-        decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, notifications)
+        decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, makespan, notifications)
 
         response = {
             "image": generate_svg_graph(G, decorations),
