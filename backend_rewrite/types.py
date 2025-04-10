@@ -76,7 +76,7 @@ class InputTask:
     assignees: list[str]
     next: list[str]
     parallelizable: bool
-    estimate: int
+    estimate: Optional[int]
     start_date: Optional[date]
     end_date: Optional[date]
     status: Status
