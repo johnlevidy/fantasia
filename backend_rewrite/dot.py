@@ -158,5 +158,6 @@ def generate_svg_graph(G, decorations):
     print(output_svg_path)
     dot_path = os.getenv('DOT_PATH', 'dot')
     subprocess.run([dot_path, '-Tsvg', dotfile_path, '-o', output_svg_path], check=True)
+
     with open(output_svg_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')

@@ -26,6 +26,7 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 
 # uuid -> semi structured view of the last plan
 last_plan:  Dict[str, list[Tuple[str, str, str]]] = defaultdict()
+last_graph: Dict[str, nx.DiGraph] = defaultdict()
 
 def get_user_id():
     if 'user_id' not in session:
@@ -36,6 +37,35 @@ def get_user_id():
 def home():
     get_user_id()
     return render_template('index.html')
+
+@app.route("/get-descendants", methods=["POST"])
+def get_descendants():
+    data = request.get_json()
+    if not data.get("node").isdigit():
+        return jsonify({"descendants": []}), 404
+    target_id = int(data.get("node"))
+    G = last_graph.get(get_user_id())
+    if G is None:
+        return jsonify({"descendants": []}), 404
+
+    # Find the node in the graph where scheduler_fields.id == target_id
+    target_node: Optional[InputTask] = None
+    for node in G:
+        if node.scheduler_fields.id == target_id:
+            target_node = node
+            break
+
+    if not target_node:
+        return jsonify({"descendants": []}), 404
+
+    # Convert back to scheduler_fields.id
+    descendant_ids = []
+    descendant_ids.append(target_id)
+    for node in nx.descendants(G, target_node):
+        descendant_ids.append(node.scheduler_fields.id)
+
+    print(f"Returning descendants: {descendant_ids}")
+    return jsonify({"descendants": descendant_ids})
 
 @app.route('/get-copy-text', methods=['GET'])
 def get_copy_text():
@@ -102,6 +132,7 @@ def process():
         
         G, makespan, _ = build_graph_and_schedule(tasks, metadata, notifications)
         last_plan[get_user_id()] = build_plan(G) if makespan and makespan >= 0 else []
+        last_graph[get_user_id()] = deepcopy(G)
 
         # Decorate G before rendering
         decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, makespan, notifications)

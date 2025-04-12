@@ -1,3 +1,30 @@
+function handleSvgClick(nodeId) {
+    fetch("/get-descendants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node: nodeId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const descendants = data.descendants; // list of node IDs
+
+        const svg = document.querySelector("svg");
+        if (!svg) return;
+
+        // Reset all to low opacity
+        svg.querySelectorAll("g.node").forEach(g => g.style.opacity = "0.3");
+
+        // Highlight the descendants
+        svg.querySelectorAll("g.node").forEach(g => {
+            const title = g.querySelector("title");
+            if (title && descendants.includes(parseInt(title.textContent, 10))) {
+                g.style.opacity = "1";
+            }
+        });
+    })
+    .catch(err => console.error("Error getting descendants:", err));
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     class SVGViewer {
         constructor() {
@@ -147,6 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+
         handleCopyClick() {
             if (this.state.isProcessing) return;
 
@@ -257,6 +285,18 @@ document.addEventListener('DOMContentLoaded', function() {
             this.elements.notificationsContainer.style.display = 'block';
             this.copyButton.style.display = 'block';
             this.state.hasPastedContent = true;
+            // Can this use this or something
+            const svg = document.querySelector("svg");
+            if (!svg) return;
+
+            svg.querySelectorAll("g.node").forEach(g => {
+                const title = g.querySelector("title");
+                if (!title) return;
+
+                const nodeId = title.textContent;
+
+                g.addEventListener("click", () => handleSvgClick(nodeId));
+            });
         }
 
         handleErrorResponse(error) {
