@@ -30,6 +30,7 @@ StatusNormalization: dict[str, Status] = {
     'blocked' : (Status.Blocked),
     'milestone' : (Status.Milestone),
     'completed' : (Status.Completed),
+    'complete' : (Status.Completed),
     'not started': (Status.NotStarted),
     '': (Status.NotStarted),
     'in review': (Status.InProgress),
@@ -76,7 +77,7 @@ class InputTask:
     assignees: list[str]
     next: list[str]
     parallelizable: bool
-    estimate: int
+    estimate: Optional[int]
     start_date: Optional[date]
     end_date: Optional[date]
     status: Status

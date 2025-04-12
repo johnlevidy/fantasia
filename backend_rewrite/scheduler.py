@@ -191,23 +191,35 @@ def get_assignees(task: InputTask, metadata: Metadata, person_to_person_id: bidi
 class DateResult:
     start_offset: int # Busdays from today until start
     end_offset: int # Busdays from today until end
-    exclude: bool # whether or not to include this value
     remaining_estimate: int # adjusted if today >= start / in progress
 
-def densify_dates(today: date, start: Optional[date], end: Optional[date], estimate: int, horizon: int) -> DateResult:
-    start_offset = busdays_between(today, start) if start else 0
-    end_offset = busdays_between(today, end) if end else horizon
-    exclude = end_offset < 0
+def densify_dates(task: InputTask, today: date, horizon: int) -> Optional[DateResult]:
+    # If  the task ended in the past I do not care about it
+    if task.end_date and today > task.end_date:
+        return None
 
-    # If not already started ( and assuming includced ) then
-    # end date must be after today. Assume it's still being worked on
-    if start_offset < 0:
-        scheduling_estimate = max(0, busdays_between(today, busdays_offset(start, estimate)))
-        start_offset = 0
-    else:
-        scheduling_estimate = estimate
+    in_progress = bool(task.start_date and today > task.start_date)
 
-    return DateResult(start_offset, end_offset, exclude, scheduling_estimate)
+    match (in_progress, bool(task.start_date), bool(task.end_date), task.estimate is not None):
+        # No estimate but may be derived
+        case (_, True, True, False):
+            effective_start = max(today, task.start_date) #type: ignore
+            remaining_estimate = busdays_between(effective_start, task.end_date)
+            return DateResult(busdays_between(today, effective_start), busdays_between(today, task.end_date), remaining_estimate)
+        # No estimate and no way to derive it
+        case (_, False, False, False):
+            raise ValueError(f"Active or future task {task.name} has no way to infer estimate. Provide start + end or estimate")
+        # I have an estimate and may or may not have a start or end
+        # The task may have already begun or not
+        # Future task which may or may not have start / end
+        case (_, _, _, True):
+            end = busdays_between(today, task.end_date) if task.end_date else horizon
+            start = busdays_between(today, task.start_date) if task.start_date else 0
+            already_complete = busdays_between(task.start_date, today) if task.start_date else 0
+            assert task.estimate is not None
+            return DateResult(start, end, task.estimate - already_complete)
+        case (_, _, _, _):
+            raise ValueError(f"Unexpected date layout for {task.name}: [{in_progress}, {task.start_date}, {task.end_date}, {task.estimate}]")
 
 # 1. Expand assignees into eligible assignees
 # 2. Assign unique people_id to Person
@@ -215,7 +227,7 @@ def densify_dates(today: date, start: Optional[date], end: Optional[date], estim
 # We need the subtasks mapping because specifically for the
 # ones with multiple "specific" assignments we need to ensure
 # they have the same start / end date
-def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[InputTask]], notifications: list[Notification]) -> Tuple[int, int]:
+def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[InputTask]], notifications: list[Notification]) -> Optional[int]:
     # Build dense Person / PersonId 
     person_to_person_id: bidict[Person, int] = bidict()
     task_to_task_id: bidict[InputTask, int] = bidict()
@@ -229,30 +241,34 @@ def find_solution(G: DiGraph, m: Metadata, ts_specific: Dict[InputTask, list[Inp
 
     today: date = datetime.datetime.now().date()
     offset: int = 0
-    for offset in range(0, 80, 5):
-        # Expand assignees, densify dates and task_id
-        id = 0
-        today_offset = busdays_offset(today, -offset)
-        task: InputTask
-        for task in G:
-            specific, pool = get_assignees(task, m, person_to_person_id)
-            res: DateResult = densify_dates(today_offset, task.start_date, task.end_date, task.estimate, horizon)
-            task.scheduler_fields = SchedulerFields(id, pool, specific, res.start_offset, res.end_offset, res.remaining_estimate, res.exclude)
-            task_to_task_id[task] = id
-            id += 1
+    # Expand assignees, densify dates and task_id
 
-        # At this point all scheduler fields are ready, we can attempt a solution no
-        assignments, makespan = schedule(G, m, person_to_person_id, horizon, ts_specific, notifications)
-        if assignments:
-            # Apply the solution to the original graph
-            # if we found one
-            for task in ValidTasks(G):
-                assignment: SchedulerAssignment = assignments[task]
+    id = 0
+    today_offset = busdays_offset(today, -offset)
+    task: InputTask
+    for task in G:
+        specific, pool = get_assignees(task, m, person_to_person_id)
+        res: Optional[DateResult] = densify_dates(task, today, horizon)
+        if not res:
+            task.scheduler_fields = SchedulerFields(id, pool, specific, 0, horizon, 0, True)
+        else:
+            task.scheduler_fields = SchedulerFields(id, pool, specific, res.start_offset, res.end_offset, res.remaining_estimate, False)
+        task_to_task_id[task] = id
+        id += 1
+
+    # At this point all scheduler fields are ready, we can attempt a solution no
+    assignments, makespan = schedule(G, m, person_to_person_id, horizon, ts_specific, notifications)
+    if assignments:
+        # Apply the solution to the original graph
+        # if we found one
+        for task in ValidTasks(G):
+            assignment: SchedulerAssignment = assignments[task]
+            # If it's a parallelizable task we prefer to just display / present the original start constraint
+            if not task.parallelizable or task.start_date is None:
                 task.start_date = busdays_offset(today_offset, assignment.start_date)
-                task.end_date = busdays_offset(today_offset, assignment.end_date)
-                task.assignees = [person_to_person_id.inv[assignment.assignee].name]
-            if offset != 0:
-                notifications.append(Notification(Severity.WARN, f"Schedule only discovered by rolling back to {today_offset}"))
-            return makespan, offset
-    notifications.append(Notification(Severity.WARN, f"Unable to find a schedule after rolling back to {today}"))
-    return -1, offset
+            task.end_date = busdays_offset(today_offset, assignment.end_date)
+            task.assignees = [person_to_person_id.inv[assignment.assignee].name]
+        if offset != 0:
+            notifications.append(Notification(Severity.WARN, f"Schedule only discovered by rolling back to {today_offset}"))
+        return makespan
+    return None

@@ -138,8 +138,8 @@ class SchedulerTest(unittest.TestCase):
         metadata.people_allocations = {Person("Alice"): 1}
         metadata.teams = {'All': Team('All', [Person("Alice")])}
 
-        _, makespan, offset = build_graph_and_schedule(tasks, metadata, [])
-        self.assertGreater(offset, 0)
+        _, makespan, offset = build_graph_and_schedule(tasks, metadata, [], step=1)
+        self.assertEqual(offset, 1)
         self.assertEqual(6, makespan)
 
     def test_complex_dependency_chain(self):
