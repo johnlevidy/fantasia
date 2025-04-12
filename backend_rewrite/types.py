@@ -30,6 +30,7 @@ StatusNormalization: dict[str, Status] = {
     'blocked' : (Status.Blocked),
     'milestone' : (Status.Milestone),
     'completed' : (Status.Completed),
+    'complete' : (Status.Completed),
     'not started': (Status.NotStarted),
     '': (Status.NotStarted),
     'in review': (Status.InProgress),

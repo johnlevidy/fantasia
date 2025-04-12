@@ -1,8 +1,10 @@
 from typing import Dict, Tuple
+from .dateutil import busdays_offset, busdays_between
+from datetime import date
 from copy import deepcopy
 from backend_rewrite.types import InputTask, Status
 
-def expand_parallelizable_tasks(tasks: list[InputTask]) -> Tuple[list[InputTask], Dict[InputTask, list[InputTask]]]:
+def expand_parallelizable_tasks(tasks: list[InputTask], today: date) -> Tuple[list[InputTask], Dict[InputTask, list[InputTask]]]:
     # Handle assigning start and end dates properly in this case
     ret = []
     ret.extend(tasks)
@@ -17,14 +19,26 @@ def expand_parallelizable_tasks(tasks: list[InputTask]) -> Tuple[list[InputTask]
             original_estimate = t.estimate
             original_end = t.end_date
 
+            # Current task which has start before today. Put as few days
+            # as possible ( which don't derail the project ) in the past
+            already_completed = busdays_between(busdays_offset(t.end_date, -t.estimate), today) if t.end_date else 0
+
             # Keep the start date, break the end / estimate
-            t.end_date = None
-            t.estimate = 1
+            if already_completed > 0:
+                # This really should not happen
+                if t.start_date and busdays_offset(today, - already_completed) < t.start_date:
+                    raise ValueError(f"Task {t.name} had a problem. Scaling back a parallelizable task caused impossible start date")
+                t.start_date = busdays_offset(today, - already_completed)
+                t.end_date = today
+                t.estimate = already_completed
+            else:
+                t.end_date = None
+                t.estimate = 1
             original_next = t.next
             last_t = t
             id = 1
 
-            for _ in range(original_estimate)[1:]:
+            for _ in range(original_estimate - t.estimate):
                 t_copy = deepcopy(t)
                 t_copy.name = t_copy.name + f"_chain_{id}"
                 t_copy.estimate = 1

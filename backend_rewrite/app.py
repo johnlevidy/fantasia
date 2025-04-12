@@ -1,12 +1,15 @@
 from collections import defaultdict
+from copy import deepcopy
 import networkx as nx
 import traceback
+from .dateutil import busdays_offset
+import datetime
 from typing import Dict, Tuple
 import uuid
 from .dot import generate_svg_graph
 from backend.app import parse_to_python
 from flask import Flask, request, jsonify, render_template, session
-from .notification import Notification
+from .notification import Notification, Severity
 
 from .types import *
 from .parse_csv import csv_string_to_task_list 
@@ -45,7 +48,7 @@ def build_plan(G) -> list[Tuple[str, str, str]]:
     for task in G:
         task_to_input_row_idx[task.name] = task.input_row_idx
 
-    result = [None] * (max([a.input_row_idx for a in G]) * 2)
+    result = [None] * (max([a.input_row_idx for a in G]) * 2 + 1)
     for task in G:
         start_string = task.start_date.strftime('%Y-%m-%d') if task.start_date else ''
         end_string = task.end_date.strftime('%Y-%m-%d') if task.end_date else ''
@@ -53,27 +56,37 @@ def build_plan(G) -> list[Tuple[str, str, str]]:
 
     return result
 
-def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notifications: list[Notification]) -> Tuple[nx.DiGraph, Optional[int], int]:
+def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notifications: list[Notification], step: int = 5) -> Tuple[nx.DiGraph, Optional[int], int]:
     # Build the upper graph and verify it
-    G = build_graph(tasks, metadata)
-    verify_graph(G)
+    offset: int = 0
+    G = nx.DiGraph()
 
-    # Expand the tasks into subtasks where appropriate
-    tasks, specific_subtasks = expand_specific_tasks(tasks)
-    tasks, parallelizable_subtasks = expand_parallelizable_tasks(tasks)
-    
-    # Build the lower graph and verify it
-    L = build_graph(tasks, metadata)
-    verify_graph(L)
+    today = datetime.datetime.now().date()
+    for offset in range(0, 80, step):
+        attempt_tasks = deepcopy(tasks)
+        today_offset = busdays_offset(today, -offset)
 
-    # Do the scheduling, note that this statefully updates L
-    makespan, offset = find_solution(L, metadata, specific_subtasks, notifications)
+        G = build_graph(attempt_tasks, metadata)
+        verify_graph(G)
 
-    if makespan:
-        # Merge L back onto G
-        merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
+        # Expand the tasks into subtasks where appropriate
+        attempt_tasks, specific_subtasks = expand_specific_tasks(attempt_tasks)
+        attempt_tasks, parallelizable_subtasks = expand_parallelizable_tasks(attempt_tasks, today_offset)
+        
+        # Build the lower graph and verify it
+        L = build_graph(attempt_tasks, metadata)
+        verify_graph(L)
 
-    return G, makespan, offset
+        # Do the scheduling, note that this statefully updates L
+        makespan = find_solution(L, metadata, specific_subtasks, notifications)
+
+        if makespan:
+            # Merge L back onto G
+            merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
+            return G, makespan, offset
+
+    notifications.append(Notification(Severity.WARN, f"Unable to find a schedule after rolling back {offset}d"))
+    return G, None, offset
 
 @app.route('/process', methods=['POST'])
 def process():
