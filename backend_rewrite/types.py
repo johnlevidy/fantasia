@@ -89,6 +89,9 @@ class InputTask:
     def __hash__(self):
         return hash(self.name)
 
+    def __eq__(self, other):
+        return isinstance(other, InputTask) and self.name == other.name
+
 @dataclass
 class Team:
     name: str

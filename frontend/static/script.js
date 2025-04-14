@@ -73,6 +73,12 @@ document.addEventListener('DOMContentLoaded', function() {
             this.copyButton.id = 'copyButton';
             header.appendChild(this.copyButton);
 
+            this.clearButton = document.createElement('button');
+            this.clearButton.textContent = 'Clear Nodes';
+            this.clearButton.className = 'button';
+            this.clearButton.id = 'clearButton';
+            header.appendChild(this.clearButton);
+
             const main = document.createElement('main');
             main.className = 'app-main';
 
@@ -155,6 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.addEventListener('resize', this.resizeHandler.bind(this));
             this.elements.contentDiv.addEventListener('paste', this.handlePaste.bind(this));
             this.copyButton.addEventListener('click', this.handleCopyClick.bind(this));
+            this.clearButton.addEventListener('click', this.handleClearClick.bind(this));
         }
 
         resizeHandler() {
@@ -173,7 +180,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-
 
         handleCopyClick() {
             if (this.state.isProcessing) return;
@@ -217,6 +223,39 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 this.copyButton.textContent = originalText;
             }, 2000);
+        }
+
+        
+        handleClearClick() {
+            if (this.state.isProcessing) return;
+
+            this.state.isProcessing = true;
+
+            console.log("Processed")
+            fetch('/clear-last-selected', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw data; 
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                this.handleSuccessResponse(data);
+            })
+            .catch(error => {
+                this.handleErrorResponse(error);
+            })
+            .finally(() => {
+                this.elements.spinner.style.display = 'none';
+                this.state.isProcessing = false;
+            });
         }
 
         handlePaste(event) {
@@ -284,6 +323,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             this.elements.notificationsContainer.style.display = 'block';
             this.copyButton.style.display = 'block';
+            this.clearButton.style.display = 'block';
             this.state.hasPastedContent = true;
             // Can this use this or something
             const svg = document.querySelector("svg");
@@ -309,7 +349,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 this.elements.notificationsContainer.style.display = 'block';
             }
-            this.copyButton.style.display = 'block';
         }
 
         clearNotifications() {

@@ -25,8 +25,9 @@ app = Flask(__name__, static_folder='../frontend/static', template_folder='../fr
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 
 # uuid -> semi structured view of the last plan
-last_plan:  Dict[str, list[Tuple[str, str, str]]] = defaultdict()
 last_graph: Dict[str, nx.DiGraph] = defaultdict()
+last_decorations: Dict[str, Dict[InputTask, Decoration]] = defaultdict()
+last_descendants: Dict[str, list[int]] = defaultdict()
 
 def get_user_id():
     if 'user_id' not in session:
@@ -65,11 +66,13 @@ def get_descendants():
         descendant_ids.append(node.scheduler_fields.id)
 
     print(f"Returning descendants: {descendant_ids}")
+    last_descendants[get_user_id()] = descendant_ids
     return jsonify({"descendants": descendant_ids})
 
 @app.route('/get-copy-text', methods=['GET'])
 def get_copy_text():
-    response = { "text": '\n'.join(['\t'.join(l) if l else "\t\t\t" for l in last_plan.get(get_user_id(), [])])}
+    lp = build_plan(last_graph[get_user_id()])
+    response = { "text": '\n'.join(['\t'.join(l) if l else "\t\t\t" for l in lp])}
     return jsonify(response)
 
 # Converting to string now makes our life a bit easier later
@@ -118,6 +121,25 @@ def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notific
     notifications.append(Notification(Severity.WARN, f"Unable to find a schedule after rolling back {offset}d"))
     return G, None, offset
 
+@app.route('/clear-last-selected', methods=['POST'])
+def clear_last_selectetd():
+    ld = set(last_descendants[get_user_id()])
+
+    G = last_graph[get_user_id()]
+    for t in G:
+        if t.scheduler_fields.id in ld:
+            t.start_date = None
+            t.end_date = None
+            t.assignees = []
+        text = "is in" if t in last_decorations[get_user_id()] else "is not in"
+        print(f"{t.name} {text} last decorations")
+
+    response = {
+        "image": generate_svg_graph(G, last_decorations[get_user_id()]),
+        "notifications": [], 
+    }
+    return jsonify(response)
+
 @app.route('/process', methods=['POST'])
 def process():
     try:
@@ -131,11 +153,11 @@ def process():
         verify_inputs(metadata, tasks)
         
         G, makespan, _ = build_graph_and_schedule(tasks, metadata, notifications)
-        last_plan[get_user_id()] = build_plan(G) if makespan and makespan >= 0 else []
-        last_graph[get_user_id()] = deepcopy(G)
 
         # Decorate G before rendering
         decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, makespan, notifications)
+        last_graph[get_user_id()] = deepcopy(G)
+        last_decorations[get_user_id()] = deepcopy(decorations)
 
         response = {
             "image": generate_svg_graph(G, decorations),
