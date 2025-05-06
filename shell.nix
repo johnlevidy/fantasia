@@ -14,6 +14,7 @@ pkgs.mkShell {
     pkgs.python311Packages.pandas
     pkgs.python311Packages.ortools
     pkgs.python311Packages.protobuf
+    pkgs.python311Packages.psycopg2
   ];
 
   shellHook = ''

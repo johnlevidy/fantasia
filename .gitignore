@@ -1,2 +1,7 @@
-venv/*
+launch.json
+pyvenv.cfg
+bin
+include
+lib
 *__pycache__*
+frontend/static/node_modules

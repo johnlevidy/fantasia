@@ -3,6 +3,8 @@ from typing import Optional
 from enum import Enum, StrEnum, auto
 from datetime import date
 
+from bidict import bidict
+
 SOON_THRESHOLD = 3
 
 # Edges only have dicts to store data; use a StrEnum to define the keys we use.
@@ -29,6 +31,7 @@ StatusNormalization: dict[str, Status] = {
     'in progress' : (Status.InProgress),
     'blocked' : (Status.Blocked),
     'milestone' : (Status.Milestone),
+    'done' : (Status.Completed),
     'completed' : (Status.Completed),
     'not started': (Status.NotStarted),
     '': (Status.NotStarted),
@@ -38,6 +41,16 @@ StatusNormalization: dict[str, Status] = {
     'waiting': (Status.InProgress),
     'paused': (Status.InProgress)
 }
+
+# A durable mapping that can be used for persistence; update as necessary
+# to deal with deprecations or semantic evolution.
+StatusCanonicalOrdinal: bidict[Status, int] = ({
+    Status.InProgress: 1,
+    Status.Blocked: 2 ,
+    Status.Milestone: 3,
+    Status.Completed: 4,
+    Status.NotStarted: 5
+})
 
 def parse_status(status: str) -> Status:
     return StatusNormalization[status] if status in StatusNormalization else Status[status]
@@ -94,8 +107,13 @@ class Team:
     members: list[Person]
 
 class Metadata:
+    project_name: str = None
     teams: dict[str, Team] = dict()
     people_allocations: dict[Person, float] = dict()
+
+    # Set the project name.
+    def set_name(self, name: str):
+        self.project_name = name
 
     # Add the person, only add the allocation if new 
     def add_person(self, person: Person):

@@ -1,3 +1,4 @@
+import base64
 from collections import defaultdict
 import traceback
 from typing import Dict, Tuple
@@ -7,6 +8,8 @@ from backend.app import parse_to_python
 from flask import Flask, request, jsonify, render_template, session
 from .notification import Notification
 
+from .calendar import TaskCalendar
+from .database import Database
 from .types import *
 from .parse_csv import csv_string_to_task_list 
 from .metadata import extract_metadata
@@ -18,10 +21,14 @@ import os
 
 app = Flask(__name__, static_folder='../frontend/static', template_folder='../frontend/templates')
 
-app.secret_key = os.environ.get("FLASK_SECRET_KEY")
+# If no secret key is provided, use a random one for this session.
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 
 # uuid -> semi structured view of the last plan
 last_plan:  Dict[str, list[Tuple[str, str, str]]] = defaultdict()
+
+# database to store project schedules
+db = Database(list(filter(None, os.environ.get("FANTASIA_DB", "").split(','))))
 
 def get_user_id():
     if 'user_id' not in session:
@@ -57,22 +64,22 @@ def build_graph_and_schedule(tasks: list[InputTask], metadata: Metadata, notific
     G = build_graph(tasks, metadata)
     verify_graph(G)
 
-    # Expand the tasks into subtasks where appropriate
-    tasks, specific_subtasks = expand_specific_tasks(tasks)
-    tasks, parallelizable_subtasks = expand_parallelizable_tasks(tasks)
+    # Expand the tasks into subtasks where appropriate.
+    tasks, ts_specific = expand_specific_tasks(tasks)
+    tasks, ts_parallelizable = expand_parallelizable_tasks(tasks)
     
     # Build the lower graph and verify it
     L = build_graph(tasks, metadata)
     verify_graph(L)
 
     # Do the scheduling, note that this statefully updates L
-    makespan, offset = find_solution(L, metadata, specific_subtasks, notifications)
+    makespan, offset = find_solution(L, metadata, ts_specific, notifications)
 
     if makespan >= 0:
-        # Merge L back onto G
-        merge_graphs(G, L, specific_subtasks, parallelizable_subtasks)
+        # Merge the lower graph back onto the upper graph.
+        merge_graphs(G, ts_specific, ts_parallelizable)
 
-    return G, makespan, offset
+    return G, L, makespan, offset
 
 @app.route('/process', methods=['POST'])
 def process():
@@ -80,18 +87,28 @@ def process():
         content = request.get_json()['content']
         notifications: list[Notification] = list()
 
+        # Try and guess the separator; if there's a tab, it's probably TSV.
+        separator = '\t' if '\t' in content else ','
+
         # Make the python data structure and extract metadata
         # then verify the inputs are consistent
-        metadata = extract_metadata(content, '\t')
-        tasks = csv_string_to_task_list(content, '\t', metadata)
+        metadata = extract_metadata(content, separator)
+        tasks = csv_string_to_task_list(content, separator, metadata)
         verify_inputs(metadata, tasks)
         
-        G, makespan, _ = build_graph_and_schedule(tasks, metadata, notifications)
+        G, L, makespan, _ = build_graph_and_schedule(tasks, metadata, notifications)
         last_plan[get_user_id()] = build_plan(G) if makespan >= 0 else []
 
         # Decorate G before rendering
         decorations: Dict[InputTask, Decoration] = decorate_and_notify(G, notifications)
 
+        # If the project has a name, build the calendar and save to the database.
+        # Note we're using the lower graph, since we want to record the specific dates
+        # that parallelizable tasks were assigned to (i.e. so that all tasks are "dense").
+        if metadata.project_name:
+            db.save_schedule(metadata.project_name, TaskCalendar.from_graph(L))
+
+        # Generate the graph and return it to the user.
         response = {
             "image": generate_svg_graph(G, decorations),
             "notifications": [n.to_dict() for n in notifications], 

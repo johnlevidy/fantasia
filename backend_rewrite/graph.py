@@ -51,7 +51,7 @@ def merge_specific(task: InputTask, subtasks: list[InputTask]):
         task.assignees.extend(s.assignees)
 
 # Merge the lower graph ( expanded ) onto the upper graph
-def merge_graphs(upper: nx.DiGraph, lower: nx.DiGraph,
+def merge_graphs(upper: nx.DiGraph, 
                  ts_specific: Dict[InputTask, list[InputTask]], 
                  ts_parallelizable: Dict[InputTask, list[InputTask]]) -> None:
     # Iterate through the upper graph and "collect" all of the assignments in the lower graph

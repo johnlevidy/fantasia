@@ -50,5 +50,6 @@ def extract_metadata(input: str, delimiter: str) -> Metadata:
                 m.add_team(parse_team(row))
             case '%ALLOCATION':
                 m.add_allocation(*parse_allocation(row))
-
+            case '%NAME':
+                m.set_name(row[1].strip())
     return m
